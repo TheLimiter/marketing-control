@@ -1,0 +1,34 @@
+<?php
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\{DashboardController, CalonKlienController, ProspekController, KlienController, TagihanController, NotifikasiController, ModulController, PenggunaanModulController, LogController};
+
+Route::get('/', fn() => redirect()->route('dashboard'));
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('/dashboard', [DashboardController::class,'index'])->name('dashboard');
+
+    Route::resource('calon-klien', CalonKlienController::class);
+    Route::post('calon-klien/{calon}/jadikan-prospek', [CalonKlienController::class,'jadikanProspek'])
+        ->name('calon.jadikan-prospek');
+
+    Route::resource('prospek', ProspekController::class)->only(['index','create','store','destroy']);
+    Route::post('prospek/{aktivitas}/follow-up', [ProspekController::class,'markFollowUp'])->name('prospek.followup');
+    Route::post('prospek/{aktivitas}/positif', [ProspekController::class,'markPositif'])->name('prospek.positif');
+    Route::post('prospek/{aktivitas}/negatif', [ProspekController::class,'markNegatif'])->name('prospek.negatif');
+
+    Route::resource('klien', KlienController::class);
+    Route::post('klien/{klien}/ttd', [KlienController::class,'markTtd'])->name('klien.ttd');
+
+    Route::resource('tagihan', TagihanController::class);
+    Route::get('tagihan/notifikasi/jatuh-tempo', [TagihanController::class,'notifikasiHMinus30'])->name('tagihan.notifikasi');
+    Route::post('tagihan/{tagihan}/bayar', [TagihanController::class,'bayar'])->name('tagihan.bayar');
+
+    Route::resource('notifikasi', NotifikasiController::class)->only(['index','store']);
+
+    Route::resource('modul', ModulController::class);
+    Route::resource('penggunaan-modul', PenggunaanModulController::class)->only(['index','store','destroy']);
+
+    Route::resource('logs', LogController::class)->only(['index'])->middleware('can:isAdmin');
+});
+
+require __DIR__.'/auth.php';

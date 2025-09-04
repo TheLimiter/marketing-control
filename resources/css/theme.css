@@ -1,0 +1,639 @@
+/* ==== TOKENS ==== */
+:root{
+  /* mapping palet → Bootstrap */
+  --bs-primary:#4067F9; --bs-secondary:#878AA6; --bs-success:#22c55e; --bs-info:#0ea5e9; --bs-warning:#f59e0b; --bs-danger:#ef4444;
+  --bs-body-bg:#F7F8FC; --bs-body-color:#131315;
+
+  /* token custom (anima) */
+  --neutral-grey-14:#EFF0F9; --neutral-grey-13:#E5E7F2; --neutral-grey-9:#C3C2D7;
+  --panel-bg:#fff;
+
+  /* brand map */
+  --brand-700:#1d4ed8; --brand-600:#2563eb; --brand-500:#3b82f6; --brand-100:#e9f0ff;
+
+  /* shorthands */
+  --neu-1:var(--bs-body-color); --neu-6:var(--bs-secondary); --neu-9:var(--neutral-grey-9);
+  --neu-13:var(--neutral-grey-13); --neu-14:var(--neutral-grey-14);
+  --white:#fff; --app-bg:var(--bs-body-bg);
+
+  /* layout tokens */
+  --card-radius:16px;
+  --shadow:0 8px 20px rgba(38,43,64,.06);
+}
+html,body{height:100%}
+body{background:var(--bs-body-bg);color:#1d2330;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial}
+
+/* NAVBAR */
+.navbar{border-bottom:1px solid var(--neutral-grey-13);background:#fff}
+.navbar .navbar-brand{font-weight:700}
+
+/* CARD */
+.card{border:1px solid var(--neutral-grey-13)!important;border-radius:var(--card-radius)!important;box-shadow:var(--shadow)}
+
+/* ===== TABLE ===== */
+.table{--bs-table-bg:#fff;border-color:var(--neutral-grey-13)}
+.table thead th{background:var(--neutral-grey-14)!important;border-bottom:2px solid var(--neutral-grey-13)!important}
+.table-hover>tbody>tr:hover>*{background:#fafbff}
+.table-compact td,.table-compact th{padding:.45rem .5rem}
+.table td,.table th{vertical-align:middle}
+
+/* ===== MATRIX HELPERS ===== */
+.anima-matrix th,.anima-matrix td{vertical-align:middle}
+.anima-matrix thead th{position:sticky;top:0;z-index:5;background:#fff}
+.anima-matrix .col-name{min-width:260px}
+.anima-matrix .col-progress{width:180px}
+.anima-matrix .mod-title{max-width:92px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;font-size:13px;color:#2a3142}
+.chk{width:18px;height:18px;cursor:pointer}
+.add-btn{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;line-height:1}
+
+/* ===== PAGE TOOLBAR (lama, tetap) ===== */
+.page-toolbar{display:flex;gap:.5rem;align-items:center}
+
+/* ===== BUTTONS ===== */
+.btn-primary{background:var(--brand-600);border-color:var(--brand-600)}
+.btn-outline-primary{color:var(--brand-600);border-color:var(--brand-600)}
+.btn-outline-primary:hover{color:#fff;background:var(--brand-600);border-color:var(--brand-600)}
+
+/* ===== FORMS (default) ===== */
+.form-control:focus{border-color:var(--brand-500);box-shadow:0 0 0 .2rem rgba(59,130,246,.15)}
+
+/* ===== PROGRESS ===== */
+.progress{background:var(--neu-13)}
+.progress-bar.bg-info{background:var(--brand-500)!important}
+
+/* ===== BADGES (pipeline) ===== */
+.badge-stage{font-weight:600}
+.badge-stage.prospek{background:#fff;border:1px solid var(--brand-500);color:var(--brand-600)}
+.badge-stage.negosiasi{background:#fff3cd;border:1px solid #ffe69c;color:#8a6d3b}
+.badge-stage.mou{background:#e0f2fe;border:1px solid #bae6fd;color:#075985}
+.badge-stage.klien{background:#dcfce7;border:1px solid #bbf7d0;color:#166534}
+
+/* ===== TOASTS ===== */
+.toast-container{position:fixed;top:12px;right:12px;z-index:1080}
+.toast{border-radius:12px;border:1px solid var(--neu-13)}
+
+/* ===== DARK MODE (opsional) ===== */
+[data-theme="dark"] body{background:#0f172a;color:#e5e7eb}
+[data-theme="dark"] .navbar{background:#0b1220;border-color:#1f2937}
+[data-theme="dark"] .card,.table{background:#0b1220;color:#e5e7eb}
+[data-theme="dark"] .table thead th{background:#0f172a;border-color:#1f2937}
+
+/* ===== SIDEBAR LAYOUT ===== */
+.mc-layout{display:flex;min-height:calc(100vh - 56px)}
+.mc-sidebar{width:260px;border-right:1px solid #eee;background:#fff}
+@media (min-width:992px){.mc-sidebar.offcanvas{visibility:visible!important;position:sticky;top:56px;transform:none}.mc-sidebar .offcanvas-header{display:none}}
+.mc-content{flex:1 1 auto;min-width:0;background:#f8f9fb}
+
+/* Sidebar nav */
+.mc-nav .nav-link{display:flex;align-items:center;gap:.5rem;padding:.625rem 1rem;color:#374151;white-space:nowrap}
+.mc-nav .nav-link:hover{background:#f2f4f7}
+.mc-nav .nav-link.active{background:#e9f2ff;color:#0b5ed7;font-weight:600;border-right:3px solid #0b5ed7}
+.mc-sep{height:1px;background:#ececec}
+
+/* MINI MODE */
+@media (min-width:992px){
+  body.mc-mini .mc-sidebar{width:80px}
+  body.mc-mini .mc-nav .nav-link{justify-content:center;padding:.625rem 0}
+  body.mc-mini .mc-nav .nav-link>.bi{margin:0;font-size:1.1rem}
+  body.mc-mini .mc-nav .nav-link>span, body.mc-mini .mc-nav .nav-link .badge{display:none!important}
+  body.mc-mini .mc-sep{margin:.25rem 0}
+  body.mc-mini .offcanvas-body .p-0{padding:0!important}
+  body.mc-mini #mcSidebar .mt-auto{padding:.5rem!important}
+  body.mc-mini #mcSidebar .mt-auto button{padding:.375rem 0;font-size:.875rem}
+  body.mc-mini .mc-sidebar{transition:width .15s ease}
+  body.mc-mini .mc-sidebar:hover{width:260px}
+  body.mc-mini .mc-sidebar:hover .mc-nav .nav-link{justify-content:flex-start;padding:.625rem 1rem}
+  body.mc-mini .mc-sidebar:hover .mc-nav .nav-link>.bi{margin-right:.5rem}
+  body.mc-mini .mc-sidebar:hover .mc-nav .nav-link>span,
+  body.mc-mini .mc-sidebar:hover .mc-nav .nav-link .badge{display:inline-flex!important}
+}
+
+/* ===================================================== */
+/*               MODERN FORM UTILITIES (baru)            */
+/* ===================================================== */
+
+/* wrapper toolbar */
+.toolbar{
+  display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;
+  background:var(--white);border:1px solid var(--neutral-grey-13);
+  border-radius:var(--card-radius);padding:.6rem;box-shadow:var(--shadow)
+}
+
+/* input/select “pill/soft” */
+.input-soft,.select-soft{
+  height:40px;background:var(--neutral-grey-14);
+  border:1px solid var(--neutral-grey-13);border-radius:999px;
+  padding:.45rem .95rem;color:var(--neu-1)
+}
+.input-soft::placeholder{color:var(--neu-9)}
+.input-soft:focus,.select-soft:focus{outline:none;background:#fff;border-color:var(--brand-500);box-shadow:0 0 0 .2rem rgba(59,130,246,.12)}
+input[type="date"].input-soft{line-height:1.2}
+
+/* select arrow custom */
+.select-soft{
+  appearance:none;-webkit-appearance:none;-moz-appearance:none;padding-right:2rem;
+  background-image:
+    linear-gradient(45deg,transparent 50%,var(--neu-6) 50%),
+    linear-gradient(135deg,var(--neu-6) 50%,transparent 50%);
+  background-position:calc(100% - 18px) calc(50% - 4px),calc(100% - 12px) calc(50% - 4px);
+  background-size:6px 6px,6px 6px;background-repeat:no-repeat
+}
+
+/* tombol rounded & ghost */
+.btn.round{border-radius:999px}
+.btn-ghost{background:var(--neutral-grey-14);border:1px solid var(--neutral-grey-13);color:#1f2937;border-radius:999px}
+.btn-ghost:hover{background:#fff;border-color:var(--brand-500)}
+
+/* chip/badge kecil */
+.chip{display:inline-flex;align-items:center;gap:.4rem;padding:.25rem .6rem;border-radius:999px;background:var(--neutral-grey-14);border:1px solid var(--neutral-grey-13);font-size:.8rem;color:#334155}
+
+/* form scope opsional: buat semua child jadi soft tanpa ubah global */
+.form--soft .form-control,
+.form--soft .form-select{height:40px;background:var(--neutral-grey-14);border:1px solid var(--neutral-grey-13);border-radius:999px;padding:.45rem .95rem}
+.form--soft .form-control:focus,
+.form--soft .form-select:focus{background:#fff;border-color:var(--brand-500);box-shadow:0 0 0 .2rem rgba(59,130,246,.12)}
+
+/* compact mobile */
+@media (max-width:576px){
+  .toolbar{padding:.5rem}
+  .toolbar .stretch{flex:1 1 100%}
+  .toolbar .input-soft,.toolbar .select-soft,.toolbar .btn{width:100%}
+}
+
+/* dark mode support untuk util */
+[data-theme="dark"] .toolbar{background:#0b1220;border-color:#1f2937}
+[data-theme="dark"] .input-soft,[data-theme="dark"] .select-soft{background:#0f172a;border-color:#1f2937;color:#e5e7eb}
+[data-theme="dark"] .btn-ghost{background:#0f172a;border-color:#1f2937;color:#e5e7eb}
+
+/* ===== Optional: table modern touch ===== */
+.table-modern thead th{background:var(--neutral-grey-14)!important}
+.table-modern tbody tr{border-bottom:1px solid var(--neutral-grey-13)}
+.table-modern tbody tr:hover{background:#fafbff}
+.table-modern .badge{border-radius:999px;font-weight:600}
+
+/* === Fix: date inputs should look like .input-soft === */
+.input-soft,
+.select-soft { border-radius: 999px !important; }
+
+.input-soft[type="date"],
+input[type="date"].input-soft {
+  background: var(--neutral-grey-14) !important;
+  border: 1px solid var(--neutral-grey-13) !important;
+  border-radius: 999px !important;
+  height: 40px !important;
+  padding: .45rem .95rem !important;
+  line-height: 1.2 !important;
+  color: var(--neu-1) !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: textfield !important;
+}
+
+/* rapikan ikon kalender dan ruangnya */
+.input-soft[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: .65;
+  cursor: pointer;
+  margin-right: 4px;
+}
+.input-soft[type="date"]::-webkit-datetime-edit,
+.input-soft[type="date"]::-webkit-datetime-edit-fields-wrapper {
+  padding: 0;
+}
+
+/* label kecil di atas input dalam toolbar */
+.toolbar .field { display:flex; flex-direction:column; gap:.25rem; }
+.toolbar .field > label { font-size:.8rem; color: var(--neu-6); margin:0; }
+
+/* samakan lebar minimal biar rapi */
+.toolbar .field.min-180 { min-width: 180px; }
+.toolbar .field.min-220 { min-width: 220px; }
+.toolbar .field.min-260 { min-width: 260px; }
+
+/* === Floating surfaces & soft controls ================================== */
+:root{
+  /* tweak feel global */
+  --card-radius: 18px;
+  --shadow-sm: 0 4px 12px rgba(17, 24, 39, .06);
+  --shadow-md: 0 10px 24px rgba(17, 24, 39, .08);
+  --shadow-lg: 0 18px 40px rgba(17, 24, 39, .12);
+  --surface: #fff;                   /* light surface */
+  --surface-muted: #f9fafb;          /* soft bg untuk toolbar/filter */
+  --border-soft: #E5E7F2;            /* neutral-grey-13 */
+}
+
+/* CARD: floating feel */
+.card{
+  background: var(--surface) !important;
+  border: 1px solid var(--border-soft) !important;
+  border-radius: var(--card-radius) !important;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow .18s ease, transform .18s ease, border-color .18s ease;
+}
+.card:hover{ box-shadow: var(--shadow-md); transform: translateY(-1px); }
+
+/* Panel datar (mis. toolbar filter) */
+.card-toolbar,
+.toolbar{
+  background: var(--surface-muted);
+  border: 1px solid var(--border-soft);
+  border-radius: calc(var(--card-radius) - 6px);
+  box-shadow: var(--shadow-sm);
+  padding: .75rem;
+}
+
+/* Table container tetap flat tapi rapi */
+.table{ --bs-table-bg: #fff; border-color: var(--border-soft); }
+.table thead th{
+  background: #F7F8FC !important;      /* neutral-grey-14 */
+  border-bottom: 2px solid var(--border-soft) !important;
+}
+.table-modern tbody tr{ transition: background .12s ease, box-shadow .12s ease; }
+.table-modern tbody tr:hover{ background: #fafbff; box-shadow: inset 0 0 0 9999px rgba(64,103,249,.02); }
+
+/* Soft inputs (seperti screenshot Kejar) */
+.input-soft, .select-soft, .form-control.input-soft, .form-select.select-soft{
+  background: #F3F6FF;                 /* brand-100-ish */
+  border: 1px solid transparent;
+  border-radius: 999px;                 /* pill */
+  padding: .6rem .9rem;
+  line-height: 1.2;
+}
+.input-soft:focus, .select-soft:focus{
+  background: #fff;
+  border-color: rgba(59,130,246,.35);
+  box-shadow: 0 0 0 .15rem rgba(59,130,246,.15);
+  outline: none;
+}
+
+/* Default form-control biar ikut soft tanpa harus ganti class */
+.form-control, .form-select{
+  border-radius: 12px;
+  border-color: var(--border-soft);
+  transition: box-shadow .15s ease, background .15s ease, border-color .15s ease;
+  box-shadow: 0 1px 0 rgba(17, 24, 39, .02) inset;
+}
+.form-control:focus, .form-select:focus{
+  border-color: rgba(59,130,246,.35);
+  box-shadow: 0 0 0 .15rem rgba(59,130,246,.12);
+}
+
+/* Buttons: rounded & elevasi halus */
+.btn{ border-radius: 12px; }
+.btn.round{ border-radius: 999px; }
+.btn-primary{ box-shadow: 0 6px 14px rgba(64,103,249,.18); }
+.btn-primary:hover{ box-shadow: 0 10px 20px rgba(64,103,249,.22); transform: translateY(-1px); }
+
+/* Utility elevasi untuk elemen lain */
+.elev-1{ box-shadow: var(--shadow-sm) !important; }
+.elev-2{ box-shadow: var(--shadow-md) !important; }
+.elev-3{ box-shadow: var(--shadow-lg) !important; }
+
+/* Dropdown & offcanvas agar konsisten */
+.dropdown-menu, .offcanvas, .modal-content{
+  border-radius: 14px;
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-md);
+}
+
+/* Dark mode touch (opsional) */
+[data-theme="dark"] .card,
+[data-theme="dark"] .dropdown-menu,
+[data-theme="dark"] .modal-content{
+  background:#0b1220 !important;
+  border-color:#1f2937 !important;
+  box-shadow: 0 10px 28px rgba(0,0,0,.45);
+}
+[data-theme="dark"] .input-soft,
+[data-theme="dark"] .select-soft{ background:#0f172a; color:#e5e7eb; }
+
+/* ===========================
+   HEADINGS ala tampilan Kejar
+   =========================== */
+
+/* Hero tanggal di atas halaman (contoh: Selasa, 02 September 2025) */
+.h-hero{
+  font-weight: 800;
+  letter-spacing: -.02em;
+  line-height: 1.15;
+  color: var(--neu-1);
+  margin: 0 0 .25rem 0;
+  font-size: clamp(1.6rem, 1.1rem + 1.6vw, 2.2rem);
+}
+.h-hero .suffix{
+  font-weight: 600;
+  color: var(--neu-6);
+  font-size: .9rem;
+  margin-left: .35rem;
+}
+
+/* Judul halaman biasa */
+.h-page{
+  font-weight: 700;
+  letter-spacing: -.01em;
+  line-height: 1.2;
+  color: #1f2937;
+  margin: 0;
+  font-size: clamp(1.25rem, 1rem + .8vw, 1.6rem);
+}
+
+/* Section title (REKAP…, Laporan Harian, dst) */
+.h-section{
+  display:flex;align-items:center;gap:.5rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+  text-transform: none;
+  color:#111827;
+  margin: 1.25rem 0 .5rem;
+  font-size: clamp(1rem, .9rem + .4vw, 1.125rem);
+}
+
+/* Eyebrow kecil di atas judul (sub-keterangan) */
+.eyebrow{
+  display:inline-block;
+  font-size:.78rem;
+  font-weight:600;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color: var(--neu-6);
+  margin-bottom:.25rem;
+}
+
+/* Keterangan halus di bawah judul */
+.subtle{
+  color: var(--neu-6);
+  font-size:.95rem;
+}
+
+/* Link aksi “Lihat Rincian →” */
+.link-action{
+  font-weight:600;
+  color: var(--brand-600);
+  text-decoration:none;
+  display:inline-flex;align-items:center;gap:.35rem;
+}
+.link-action:hover{color:var(--brand-500);text-decoration:underline}
+
+/* Divider tipis opsional antar blok */
+.hr-soft{
+  height:1px;border:0;background:var(--neutral-grey-13);margin:1rem 0;
+}
+
+/* Dark mode tweaks */
+[data-theme="dark"] .h-hero,
+[data-theme="dark"] .h-page,
+[data-theme="dark"] .h-section{ color:#e5e7eb }
+[data-theme="dark"] .subtle,
+[data-theme="dark"] .eyebrow{ color:#94a3b8 }
+[data-theme="dark"] .link-action{ color:#93c5fd }
+[data-theme="dark"] .link-action:hover{ color:#bfdbfe }
+
+/* ===== PATCH: inputs putih + stroked (aktif) ===== */
+.input-soft,
+.select-soft,
+.form-control.input-soft,
+.form-select.select-soft {
+  background: #fff !important;                          /* putih */
+  border: 1px solid var(--neutral-grey-13) !important;  /* stroke halus */
+  color: var(--neu-1) !important;
+  border-radius: 999px !important;
+  height: 40px !important;
+  padding: .45rem .95rem !important;
+  line-height: 1.2 !important;
+}
+
+.input-soft::placeholder { color: var(--neu-6) !important; opacity: 1 !important; }
+
+.input-soft:focus,
+.select-soft:focus {
+  background: #fff !important;
+  border-color: var(--brand-500) !important;
+  box-shadow: 0 0 0 .2rem rgba(59,130,246,.14) !important;
+  outline: none !important;
+}
+
+/* Date input juga putih + stroke */
+.input-soft[type="date"],
+input[type="date"].input-soft {
+  background: #fff !important;
+  border: 1px solid var(--neutral-grey-13) !important;
+  border-radius: 999px !important;
+}
+.input-soft[type="date"]::-webkit-calendar-picker-indicator { opacity: .8; cursor: pointer; }
+
+/* (Opsional) Kalau cuma mau “Kata kunci” saja yang diputihkan, pakai ini:
+.toolbar input[name="q"] { background:#fff !important; border:1px solid var(--neutral-grey-13) !important; }
+*/
+/* ================== DIFFERENTIATE INPUT TYPES ================== */
+
+/* 1) TEXT INPUTS  ------------------------------------------------ */
+input.input-soft[type="text"],
+input.input-soft[type="search"],
+input.input-soft[type="email"],
+input.input-soft[type="number"],
+input.input-soft:not([type]),      /* fallback */
+textarea.input-soft {
+  background: #fff !important;                          /* putih aktif */
+  border: 1px solid var(--neutral-grey-13) !important;  /* stroke halus */
+  color: var(--neu-1) !important;
+  border-radius: 999px !important;
+  height: 40px !important;
+  padding: .45rem .95rem !important;
+}
+textarea.input-soft { height: auto !important; border-radius: 14px !important; }
+
+/* 2) DROPDOWN (SELECT)  ----------------------------------------- */
+select.select-soft {
+  background: #f8fbff !important;                       /* tint tipis supaya beda */
+  border: 1px solid #cfe0ff !important;                 /* stroke kebiruan */
+  color: var(--neu-1) !important;
+  border-radius: 999px !important;
+  height: 40px !important;
+  padding: .45rem 2.25rem .45rem .95rem !important;     /* ruang untuk chevron */
+  cursor: pointer;
+  appearance: none; -webkit-appearance: none; -moz-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #4f46e5 50%),
+    linear-gradient(135deg, #4f46e5 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 52%,
+    calc(100% - 12px) 52%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+select.select-soft:focus {
+  background: #fff !important;
+  border-color: var(--brand-500) !important;
+  box-shadow: 0 0 0 .2rem rgba(59,130,246,.14) !important;
+}
+
+/* 3) FIELDS "ISIAN SISTEM" (opsional) --------------------------- */
+/* Tambahkan class .is-system ke input/select yang nilai utamanya dikontrol sistem. */
+.input-soft.is-system,
+.select-soft.is-system {
+  background: #f6f7ff !important;
+  border: 1px solid #bfd2ff !important;
+  position: relative;
+  padding-left: 1.15rem !important;
+  box-shadow: inset 2px 0 0 0 #3b82f6;                  /* aksen bar kiri */
+}
+
+/* Chip kecil penanda di kanan input (opsional) */
+.input-wrap { position: relative; }
+.chip-aux {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  font-size: .72rem; padding: .15rem .45rem; border-radius: 999px;
+  background: #e9f0ff; color: #1d4ed8; border: 1px solid #cfe0ff;
+  pointer-events: none;
+}
+
+/* 4) Fokus & placeholder konsisten */
+.input-soft::placeholder { color: var(--neu-6) !important; }
+.input-soft:focus {
+  background: #fff !important;
+  border-color: var(--brand-500) !important;
+  box-shadow: 0 0 0 .2rem rgba(59,130,246,.14) !important;
+  outline: none !important;
+}
+
+/* 5) Date input ikut gaya text input */
+.input-soft[type="date"],
+input[type="date"].input-soft {
+  background: #fff !important; border: 1px solid var(--neutral-grey-13) !important;
+  border-radius: 999px !important; height: 40px !important; padding: .45rem .95rem !important;
+}
+.input-soft[type="date"]::-webkit-calendar-picker-indicator { opacity: .85; cursor: pointer; }
+
+/* Dark mode tweak */
+[data-theme="dark"] select.select-soft { background:#0f172a !important; border-color:#334155 !important; }
+[data-theme="dark"] .input-soft.is-system, [data-theme="dark"] .select-soft.is-system {
+  background:#0f172a !important; box-shadow: inset 2px 0 0 0 #60a5fa;
+}
+
+/* ==== FIXED SIDEBAR LAYOUT (no offcanvas, no push) ==== */
+:root { --topbar-h: 56px; --sidebar-w: 260px; }
+
+.mc-layout{ min-height: calc(100vh - var(--topbar-h)); }
+
+.mc-sidebar{
+  position: fixed;            /* kunci di viewport */
+  top: var(--topbar-h);
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-w);
+  height: calc(100vh - var(--topbar-h));
+  overflow: auto;
+  border-right: 1px solid #eee;
+  background: #fff;
+  z-index: 1030;              /* di atas konten */
+}
+
+.mc-content{
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: var(--sidebar-w);   /* geser konten */
+  background: #f8f9fb;
+}
+
+/* MINI MODE: kecilkan sidebar, konten ikut menyesuaikan */
+body.mc-mini{ --sidebar-w: 80px; }
+body.mc-mini .mc-nav .nav-link{ justify-content:center; padding:.625rem 0; }
+body.mc-mini .mc-nav .nav-link>.bi{ margin:0; font-size:1.1rem }
+body.mc-mini .mc-nav .nav-link>span,
+body.mc-mini .mc-nav .nav-link .badge{ display:none !important; }
+body.mc-mini .mc-sep{ margin:.25rem 0 }
+body.mc-mini .mc-sidebar{ transition: width .15s ease; }
+body.mc-mini .mc-sidebar:hover{ --sidebar-w: 260px; } /* expand saat hover desktop */
+body.mc-mini .mc-sidebar:hover .mc-nav .nav-link{ justify-content:flex-start; padding:.625rem 1rem; }
+body.mc-mini .mc-sidebar:hover .mc-nav .nav-link>.bi{ margin-right:.5rem; }
+body.mc-mini .mc-sidebar:hover .mc-nav .nav-link>span,
+body.mc-mini .mc-sidebar:hover .mc-nav .nav-link .badge{ display:inline-flex !important; }
+
+/* Pastikan kontainer konten tetap responsif */
+@media (max-width: 991.98px){
+  /* kamu masih bisa pakai mini mode di mobile via tombol, tapi sidebar tetap fixed */
+  body:not(.mc-mini){ --sidebar-w: 220px; } /* optionally kecilkan default di mobile */
+}
+
+/* ===== Sidebar: scrollbar auto-show on hover/scroll ===== */
+.mc-sidebar{
+  /* default: sembunyikan */
+  --sb-w: 0px;
+  overflow: auto;
+  scrollbar-width: none;                 /* Firefox */
+  -ms-overflow-style: none;              /* Edge/IE legacy */
+}
+.mc-sidebar::-webkit-scrollbar{          /* Chrome/Safari/Edge */
+  width: var(--sb-w);
+  height: var(--sb-w);
+}
+.mc-sidebar::-webkit-scrollbar-track{ background: transparent; }
+.mc-sidebar::-webkit-scrollbar-thumb{
+  background: rgba(17,24,39,.32);
+  border-radius: 8px;
+}
+.mc-sidebar::-webkit-scrollbar-thumb:hover{ background: rgba(17,24,39,.45); }
+
+/* tampilkan scrollbar saat hover ATAU saat class .is-scrolling aktif */
+.mc-sidebar:hover,
+.mc-sidebar.is-scrolling{
+  --sb-w: 10px;
+  scrollbar-width: thin;                 /* Firefox */
+  scrollbar-color: rgba(17,24,39,.32) transparent;
+}
+
+/* opsional: di mobile biar tetap hidden (hemat ruang) */
+@media (max-width: 992px){
+  .mc-sidebar:hover,
+  .mc-sidebar.is-scrolling{
+    --sb-w: 8px;                         /* atau 0px kalau mau tetap hilang */
+  }
+}
+
+
+/* =========================
+   PATCH: Soft column highlight
+   ========================= */
+
+/* Pastikan hanya area padding yang diwarnai & pseudo-element tidak bleed */
+.table td.cell-warning,
+.table td.cell-danger{
+  position: relative;
+  background-clip: padding-box; /* jangan “nyiram” ke border */
+  overflow: hidden;             /* pseudo-element tetap di dalam sel */
+}
+
+/* Pakai pastel agar tidak jadi blok gelap */
+.table td.cell-warning{ background-color:#FFF7ED !important; } /* amber-50 */
+.table td.cell-danger { background-color:#FEE2E2 !important; } /* red-100 */
+
+/* Garis aksen tipis di sisi kiri */
+.table td.cell-warning::before,
+.table td.cell-danger::before{
+  content:"";
+  position:absolute; left:0; top:0; bottom:0; width:4px;
+  border-top-left-radius:8px; border-bottom-left-radius:8px;
+}
+.table td.cell-warning::before{ background:#f59e0b; }
+.table td.cell-danger::before { background:#ef4444; }
+
+/* Elemen dalam sel (progress bar, badge, dll.) selalu di atas highlight */
+.table td.cell-warning > *,
+.table td.cell-danger  > *{
+  position: relative;
+  z-index: 1;
+}
+
+/* Progress bar: pastikan track tetap terang, teks kecil rapi */
+.progress{ background: var(--neutral-grey-13) !important; }
+.progress .progress-bar{ font-size:.75rem; line-height:1; }
+
+/* Tombol “Detail” bentuk pill tetap konsisten */
+.btn.btn-outline-secondary.round{
+  border-radius:999px !important;
+}
+
+/* (Opsional) hover row lembut; kadang terlihat terlalu kontras di Windows */
+.table-modern tbody tr:hover{
+  background:#fafbff !important;
+  box-shadow:none !important;
+}
