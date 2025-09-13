@@ -1,25 +1,15 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @php
-    use Illuminate\Support\Str;
-    use App\Models\MasterSekolah as MS;
-
-    // mapping stage → label & warna
+    // mapping stage -> label
     $stageOptions = [
-        MS::ST_CALON      => 'Calon',
-        MS::ST_PROSPEK    => 'Prospek',
-        MS::ST_NEGOSIASI  => 'Negosiasi',
-        MS::ST_MOU        => 'MOU',
-        MS::ST_KLIEN      => 'Klien',
+        \App\Models\MasterSekolah::ST_CALON     => 'Calon',
+        \App\Models\MasterSekolah::ST_PROSPEK   => 'Prospek',
+        \App\Models\MasterSekolah::ST_NEGOSIASI => 'Negosiasi',
+        \App\Models\MasterSekolah::ST_MOU       => 'MOU',
+        \App\Models\MasterSekolah::ST_KLIEN     => 'Klien',
     ];
-    // Ini tidak lagi diperlukan karena badge-stage sudah punya class sendiri
-    // $stageColor = [
-    //     MS::ST_CALON      => 'secondary',
-    //     MS::ST_PROSPEK    => 'info',
-    //     MS::ST_NEGOSIASI  => 'warning',
-    //     MS::ST_MOU        => 'primary',
-    //     MS::ST_KLIEN      => 'success',
-    // ];
+
     $st = (string) request('stage');
 @endphp
 
@@ -40,7 +30,7 @@
         <div class="toolbar">
             <div class="field flex-grow-1" style="min-width:260px">
                 <label>Cari nama sekolah</label>
-                <input type="text" name="q" value="{{ request('q') }}" class="input-soft" placeholder="Ketik nama sekolah…">
+                <input type="text" name="q" value="{{ request('q') }}" class="input-soft" placeholder="Ketik nama sekolah...">
             </div>
 
             <div class="field" style="min-width:200px">
@@ -100,20 +90,20 @@
                                 <a href="{{ route('master.edit',$sid) }}" class="text-decoration-none">
                                     {{ $x->nama_sekolah ?? '-' }}
                                 </a>
-                                <div class="small text-muted">{{ $x->alamat ?: '—' }}</div>
+                                <div class="small text-muted">{{ $x->alamat ?: '&mdash;' }}</div>
                             </td>
 
                             {{-- Kontak --}}
                             <td>
-                                <div class="small">{{ $x->narahubung ?: '—' }}</div>
-                                <div class="small text-muted">{{ $x->no_hp ?: '—' }}</div>
+                                <div class="small">{{ $x->narahubung ?: '&mdash;' }}</div>
+                                <div class="small text-muted">{{ $x->no_hp ?: '&mdash;' }}</div>
                             </td>
 
                             {{-- Stage + controls kecil --}}
                             <td>
                                 <div class="d-flex align-items-center gap-2">
-                                    {{-- PERBAIKAN: Menetapkan kelas 'secondary' secara eksplisit untuk badge Calon --}}
-                                    <span class="badge badge-stage {{ $x->stage == MS::ST_CALON ? 'secondary' : strtolower($stageOptions[$x->stage]) }}">
+                                    {{-- badge stage --}}
+                                    <span class="badge badge-stage {{ $x->stage == \App\Models\MasterSekolah::ST_CALON ? 'secondary' : strtolower($stageOptions[$x->stage] ?? '') }}">
                                         {{ $stageOptions[$x->stage] ?? '-' }}
                                     </span>
 
@@ -127,9 +117,10 @@
                                                 @if($val !== $x->stage)
                                                     <li>
                                                         <form action="{{ route('master.stage.update', $sid) }}" method="POST">
-                                                            @csrf @method('PATCH')
+                                                            @csrf
+                                                            @method('PATCH')
                                                             <input type="hidden" name="to" value="{{ $val }}">
-                                                            <button type="submit" class="dropdown-item">→ {{ $label }}</button>
+                                                            <button type="submit" class="dropdown-item">-> {{ $label }}</button>
                                                         </form>
                                                     </li>
                                                 @endif
@@ -141,7 +132,7 @@
 
                             {{-- MOU (status + tombol form) --}}
                             <td class="text-center">
-                                {!! $mouAda ? '<span class="badge badge-stage mou">Ada</span>' : '<span class="badge badge-stage secondary">—</span>' !!}
+                                {!! $mouAda ? '<span class="badge badge-stage mou">Ada</span>' : '<span class="badge badge-stage secondary">&mdash;</span>' !!}
                                 <div class="mt-1">
                                     <a href="{{ route('master.mou.form', $sid) }}" class="btn btn-sm btn-ghost round" title="Input / Perbarui MOU">
                                         <i class="bi bi-file-earmark-plus"></i>
@@ -151,7 +142,7 @@
 
                             {{-- TTD --}}
                             <td class="text-center">
-                                {!! $x->ttd_status ? '<span class="badge badge-stage klien">OK</span>' : '<span class="badge badge-stage secondary">—</span>' !!}
+                                {!! $x->ttd_status ? '<span class="badge badge-stage klien">OK</span>' : '<span class="badge badge-stage secondary">&mdash;</span>' !!}
                             </td>
 
                             {{-- Progress modul --}}
@@ -188,32 +179,40 @@
                                     </a>
 
                                     {{-- Detail (offcanvas) --}}
-                                    <button type="button"
-                                            class="btn btn-sm btn-outline-secondary round"
-                                            data-bs-toggle="offcanvas"
-                                            data-bs-target="#schoolDetail"
-                                            title="Detail sekolah"
-                                            data-nama="{{ $x->nama_sekolah }}"
-                                            data-jenjang="{{ $x->jenjang ?? '—' }}"
-                                            data-alamat="{{ $x->alamat ?? '—' }}"
-                                            data-narahubung="{{ $x->narahubung ?? '—' }}"
-                                            data-nohp="{{ $x->no_hp ?? '—' }}"
-                                            data-sumber="{{ $x->sumber ?? '—' }}"
-                                            data-siswa="{{ $x->jumlah_siswa ?? '—' }}"
-                                            data-mou="{{ $mouAda ? 'Ada' : '—' }}"
-                                            data-ttd="{{ $x->ttd_status ? 'OK' : '—' }}"
-                                            data-stage="{{ $stageOptions[$x->stage] ?? '-' }}"
-                                            data-tindak="{{ $x->tindak_lanjut ?? '—' }}"
-                                            data-catatan="{{ $x->catatan ? Str::limit($x->catatan, 200) : '—' }}"
-                                            data-created="{{ optional($x->created_at)->format('d/m/Y H:i') }}"
-                                            data-updated="{{ optional($x->updated_at)->diffForHumans() }}">
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-secondary round"
+                                        data-bs-toggle="offcanvas"
+                                        data-bs-target="#schoolDetail"
+                                        title="Detail sekolah"
+                                        data-nama="{{ $x->nama_sekolah }}"
+                                        data-jenjang="{{ $x->jenjang ?? '—' }}"
+                                        data-alamat="{{ $x->alamat ?? '—' }}"
+                                        data-narahubung="{{ $x->narahubung ?? '—' }}"
+                                        data-nohp="{{ $x->no_hp ?? '—' }}"
+                                        data-sumber="{{ $x->sumber ?? '—' }}"
+                                        data-siswa="{{ $x->jumlah_siswa ?? '—' }}"
+                                        data-mou="{{ $mouAda ? 'Ada' : '—' }}"
+                                        data-ttd="{{ $x->ttd_status ? 'OK' : '—' }}"
+                                        data-stage="{{ $stageOptions[$x->stage] ?? '-' }}"
+                                        data-tindak="{{ $x->tindak_lanjut ?? '—' }}"
+                                        data-catatan="{{ $x->catatan ? \Illuminate\Support\Str::limit($x->catatan, 200) : '—' }}"
+                                        data-created="{{ optional($x->created_at)->format('d/m/Y H:i') }}"
+                                        data-updated="{{ optional($x->updated_at)->diffForHumans() }}"
+                                        data-edit="{{ route('master.edit',$sid) }}"
+                                        data-aktivitas="{{ route('master.aktivitas.index',$sid) }}"
+                                        data-progress="{{ route('progress.show',$sid) }}"
+                                        data-batch="{{ route('penggunaan-modul.batch-form', ['school' => $sid]) }}"
+                                    >
                                         <i class="bi bi-info-circle me-1"></i> Detail
                                     </button>
                                 </div>
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="8" class="text-center text-muted py-4">Belum ada data.</td></tr>
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">Belum ada data.</td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>
@@ -224,218 +223,6 @@
             {{ $rows->appends(request()->query())->links() }}
         </div>
     </div>
+
+    @include('master.partials.offcanvas')
 @endsection
-
-{{-- Offcanvas Detail Sekolah (improved) --}}
-<div class="offcanvas offcanvas-end" tabindex="-1" id="schoolDetail" aria-labelledby="schoolDetailLabel" style="--bs-offcanvas-width:480px">
-  <div class="offcanvas-header border-bottom">
-    <div>
-      <div class="eyebrow mb-1">Detail Sekolah</div>
-      <h5 class="offcanvas-title h-page mb-0" id="schoolDetailLabel" data-f="nama">-</h5>
-      <div class="subtle mt-1">
-        <span class="chip" data-f="jenjang">—</span>
-        <span class="chip stage-chip" data-f="stage">—</span>
-        <span class="chip" data-f="mou">—</span>
-        <span class="chip" data-f="ttd">—</span>
-      </div>
-    </div>
-    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-  </div>
-
-  <div class="offcanvas-body">
-    {{-- Alamat --}}
-    <div class="card p-3 mb-3">
-      <div class="d-flex align-items-start gap-2">
-        <i class="bi bi-geo-alt text-muted mt-1"></i>
-        <div class="flex-grow-1">
-          <div class="h-section mb-1">Alamat</div>
-          <div class="small" data-f="alamat">—</div>
-        </div>
-        <button class="btn btn-sm btn-ghost round copy-btn" data-copy="alamat" title="Salin alamat">
-          <i class="bi bi-clipboard"></i>
-        </button>
-      </div>
-    </div>
-
-    {{-- Kontak --}}
-    <div class="card p-3 mb-3">
-      <div class="row g-3">
-        <div class="col-12 col-md-6">
-          <div class="d-flex align-items-start gap-2">
-            <i class="bi bi-person-lines-fill text-muted mt-1"></i>
-            <div>
-              <div class="h-section mb-1">Narahubung</div>
-              <div class="small" data-f="narahubung">—</div>
-            </div>
-          </div>
-        </div>
-        <div class="col-12 col-md-6">
-          <div class="d-flex align-items-start gap-2">
-            <i class="bi bi-telephone text-muted mt-1"></i>
-            <div>
-              <div class="h-section mb-1">No. HP</div>
-              <div class="small" data-f="nohp">—</div>
-              <div class="d-flex gap-2 mt-1">
-                <a class="btn btn-sm btn-outline-secondary round action-call" target="_blank">
-                  <i class="bi bi-telephone-outbound me-1"></i> Telepon
-                </a>
-                <a class="btn btn-sm btn-outline-success round action-wa" target="_blank">
-                  <i class="bi bi-whatsapp me-1"></i> WhatsApp
-                </a>
-                <button class="btn btn-sm btn-ghost round copy-btn" data-copy="nohp" title="Salin nomor">
-                  <i class="bi bi-clipboard"></i>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    {{-- Info Lainnya --}}
-    <div class="card p-3 mb-3">
-      <div class="row small g-3">
-        <div class="col-6">
-          <div class="text-muted">Jumlah Siswa</div>
-          <div class="fw-semibold" data-f="siswa">—</div>
-        </div>
-        <div class="col-6">
-          <div class="text-muted">Sumber</div>
-          <div class="fw-semibold" data-f="sumber">—</div>
-        </div>
-        <div class="col-12">
-          <div class="text-muted">Tindak Lanjut</div>
-          <div class="fw-semibold" data-f="tindak">—</div>
-        </div>
-        <div class="col-12">
-          <div class="text-muted">Catatan</div>
-          <div class="fw-semibold" data-f="catatan">—</div>
-        </div>
-      </div>
-    </div>
-
-    {{-- Meta & Quick Actions --}}
-    <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
-      <div class="text-muted small">
-        Dibuat: <span data-f="created">—</span> • Update: <span data-f="updated">—</span>
-      </div>
-      <div class="d-flex flex-wrap gap-2">
-        <a href="#" class="btn btn-sm btn-ghost round quick-aktivitas">
-          <i class="bi bi-clock-history me-1"></i> Aktivitas
-        </a>
-        <a href="#" class="btn btn-sm btn-ghost round quick-progress">
-          <i class="bi bi-graph-up-arrow me-1"></i> Progress
-        </a>
-        <a href="#" class="btn btn-sm btn-primary round quick-edit">
-          <i class="bi bi-pencil me-1"></i> Edit
-        </a>
-      </div>
-    </div>
-  </div>
-</div>
-
-{{-- Script pengisi offcanvas (improved) --}}
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  const off = document.getElementById('schoolDetail');
-  if (!off) return;
-
-  const stageClass = (txt='') => {
-    const k = (txt || '').toString().trim().toLowerCase();
-    if (k.includes('calon')) return 'badge-stage calon';
-    if (k.includes('prospek')) return 'badge-stage prospek';
-    if (k.includes('negosiasi')) return 'badge-stage negosiasi';
-    if (k.includes('mou')) return 'badge-stage mou';
-    if (k.includes('klien')) return 'badge-stage klien';
-    return 'chip'; // fallback
-  };
-
-  const setText = (key, v) => {
-    const el = off.querySelector(`[data-f="${key}"]`);
-    if (!el) return;
-    el.textContent = v && v !== '' ? v : '—';
-  };
-
-  const buildTel = (raw='') => {
-    const num = (raw || '').replace(/[^0-9+]/g, '');
-    return num ? `tel:${num}` : '#';
-  };
-
-  const buildWa = (raw='') => {
-    // normalisasi ke 62 jika diawali 0
-    let num = (raw || '').replace(/[^0-9]/g, '');
-    if (!num) return '#';
-    if (num.startsWith('0')) num = '62' + num.slice(1);
-    if (!num.startsWith('62')) num = '62' + num;
-    return `https://wa.me/${num}`;
-  };
-
-  // copy helper
-  const copyText = (txt='') => {
-    if (!navigator.clipboard) return;
-    navigator.clipboard.writeText(txt).then(() => {
-      // kecilkan notifikasi: gunakan BS toast kalau ada, kalau tidak, title jadi “Tersalin”
-    });
-  };
-
-  off.addEventListener('show.bs.offcanvas', (ev) => {
-    const b = ev.relatedTarget;
-    if (!b?.dataset) return;
-
-    // set teks
-    setText('nama', b.dataset.nama);
-    setText('jenjang', b.dataset.jenjang);
-    setText('stage', b.dataset.stage);
-    setText('alamat', b.dataset.alamat);
-    setText('narahubung', b.dataset.narahubung);
-    setText('nohp', b.dataset.nohp);
-    setText('siswa', b.dataset.siswa);
-    setText('sumber', b.dataset.sumber);
-    setText('mou', b.dataset.mou);
-    setText('ttd', b.dataset.ttd);
-    setText('tindak', b.dataset.tindak);
-    setText('catatan', b.dataset.catatan);
-    setText('created', b.dataset.created);
-    setText('updated', b.dataset.updated);
-
-    // stage pill look
-    const stageEl = off.querySelector('[data-f="stage"]');
-    if (stageEl) {
-      stageEl.className = 'chip stage-chip'; // reset
-      stageEl.className = stageClass(b.dataset.stage);
-      stageEl.textContent = b.dataset.stage || '—';
-    }
-
-    // actions (edit/aktivitas/progress) – ambil URL dari data-* pada tombol pemicu
-    const aEdit = off.querySelector('.quick-edit');
-    const aAkt  = off.querySelector('.quick-aktivitas');
-    const aProg = off.querySelector('.quick-progress');
-    if (aEdit) aEdit.href = b.dataset.edit || '#';
-    if (aAkt)  aAkt.href  = b.dataset.aktivitas || '#';
-    if (aProg) aProg.href = b.dataset.progress || '#';
-
-    // call/wa links
-    const call = off.querySelector('.action-call');
-    const wa   = off.querySelector('.action-wa');
-    if (call) call.href = buildTel(b.dataset.nohp || '');
-    if (wa)   wa.href   = buildWa(b.dataset.nohp || '');
-
-    // wire copy buttons
-    off.querySelectorAll('.copy-btn').forEach(btn => {
-      btn.onclick = () => {
-        const key = btn.getAttribute('data-copy');
-        const el  = off.querySelector(`[data-f="${key}"]`);
-        if (el) copyText(el.textContent.trim());
-      };
-    });
-  });
-});
-</script>
-
-{{-- Sedikit styling khusus offcanvas (opsional, aman dipasang di sini) --}}
-<style>
-#schoolDetail .chip{padding:.25rem .6rem;border-radius:999px;border:1px solid var(--neutral-grey-13);background:var(--neutral-grey-14);font-weight:600}
-#schoolDetail .card{border-radius:14px}
-#schoolDetail .h-section{font-weight:700;font-size:.95rem}
-#schoolDetail .stage-chip.badge-stage{border:1px solid var(--neutral-grey-13)} /* sinkron feel */
-</style>

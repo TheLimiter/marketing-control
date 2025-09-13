@@ -1,18 +1,33 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\{
-    DashboardController, CalonKlienController, ProspekController, KlienController,
-    TagihanController, NotifikasiController, ModulController, PenggunaanModulController,
-    LogController, UserController, ActivityLogController, MasterSekolahController, MouController,
-    AktivitasController, AktivitasFileController, ProgressModulController
-};
+
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\CalonKlienController;
+use App\Http\Controllers\ProspekController;
+use App\Http\Controllers\KlienController;
+use App\Http\Controllers\TagihanController;
+use App\Http\Controllers\NotifikasiController;
+use App\Http\Controllers\ModulController;
+use App\Http\Controllers\PenggunaanModulController;
+use App\Http\Controllers\LogController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\MasterSekolahController;
+use App\Http\Controllers\MouController;
+use App\Http\Controllers\AktivitasController;
+use App\Http\Controllers\AktivitasFileController;
+use App\Http\Controllers\ProgressModulController;
+
 use App\Http\Controllers\Admin\UserAdminController;
 use App\Http\Controllers\AccountController;
-use App\Models\{Modul, PenggunaanModul, TagihanKlien};
+
+use App\Models\Modul;
+use App\Models\PenggunaanModul;
+use App\Models\TagihanKlien;
 
 // Redirect root URL to dashboard
-Route::get('/', fn() => redirect()->route('dashboard'));
+Route::get('/', fn () => redirect()->route('dashboard'));
 
 Route::middleware(['auth'])->group(function () {
     // --- Dashboard ---
@@ -40,6 +55,9 @@ Route::middleware(['auth'])->group(function () {
 
         // Calon -> Prospek
         Route::post('{calon}/jadikan-prospek', [ProspekController::class, 'storeFromCalon'])->name('jadikan-prospek');
+
+        // Activity log (list)
+        Route::get('/activity', [ActivityLogController::class, 'index'])->name('activity.index');
     });
 
     // --- Prospek ---
@@ -59,24 +77,23 @@ Route::middleware(['auth'])->group(function () {
     Route::post('klien/{klien}/ttd', [KlienController::class, 'markTtd'])->name('klien.ttd');
 
     // --- Tagihan (spesifik di atas resource) ---
-    // Builder export & PDF & status pembayaran (sesuai patch segmen B)
     Route::get('tagihan-export', [TagihanController::class, 'export'])->name('tagihan.export');
     Route::get('tagihan/{tagihan}/pdf', [TagihanController::class, 'pdf'])->name('tagihan.pdf');
     Route::post('tagihan/{tagihan}/mark-paid', [TagihanController::class, 'markPaid'])->name('tagihan.markPaid');
     Route::post('tagihan/{tagihan}/mark-unpaid', [TagihanController::class, 'markUnpaid'])->name('tagihan.markUnpaid');
     Route::get('tagihan/{tagihan}/wa', [TagihanController::class, 'wa'])->name('tagihan.wa');
 
-    // (opsional lama) laporan & notifikasi — tetap dipertahankan
+    // Laporan & notifikasi
     Route::get('tagihan/laporan', [TagihanController::class, 'laporan'])->name('tagihan.laporan');
     Route::get('tagihan/laporan/csv', [TagihanController::class, 'laporanExportCsv'])->name('tagihan.laporan.csv');
-    Route::get('tagihan/notifikasi/hminus', [TagihanController::class,'notifikasiHMinus30'])->name('tagihan.notifikasi.hminus');
-    Route::get('tagihan/notifikasi/jatuh-tempo', [TagihanController::class,'notifikasiJatuhTempo'])->name('tagihan.notifikasi.jatuh-tempo');
+    Route::get('tagihan/notifikasi/hminus', [TagihanController::class, 'notifikasiHMinus30'])->name('tagihan.notifikasi.hminus');
+    Route::get('tagihan/notifikasi/jatuh-tempo', [TagihanController::class, 'notifikasiJatuhTempo'])->name('tagihan.notifikasi.jatuh-tempo');
     Route::get('tagihan/{tagihan}/notifikasi', [TagihanController::class, 'notifikasi'])->name('tagihan.notifikasi');
     Route::post('tagihan/{tagihan}/notifikasi', [TagihanController::class, 'kirimNotifikasi'])->name('tagihan.notifikasi.kirim');
 
     Route::resource('tagihan', TagihanController::class);
 
-    // Form pembayaran (tetap)
+    // Form pembayaran
     Route::get('tagihan/{tagihan}/bayar',  [TagihanController::class, 'bayarForm'])->name('tagihan.bayar');
     Route::post('tagihan/{tagihan}/bayar', [TagihanController::class, 'bayarSimpan'])->name('tagihan.bayar.simpan');
 
@@ -84,29 +101,33 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('notifikasi', NotifikasiController::class)->only(['index', 'store']);
 
     // --- Modul ---
-    Route::resource('modul', ModulController::class); // hapus duplikasi route delete; authorize di controller
+    Route::resource('modul', ModulController::class);
 
     // --- Penggunaan Modul ---
     Route::prefix('penggunaan-modul')->name('penggunaan-modul.')->group(function () {
-        Route::get('/', [PenggunaanModulController::class,'index'])->name('index');
-        Route::get('/create', [PenggunaanModulController::class,'create'])->name('create');
-        Route::get('/prefill', [PenggunaanModulController::class,'prefill'])->name('prefill');
+        Route::get('/', [PenggunaanModulController::class, 'index'])->name('index');
+        Route::get('/create', [PenggunaanModulController::class, 'create'])->name('create');
+        Route::get('/prefill', [PenggunaanModulController::class, 'prefill'])->name('prefill');
 
-        // rute 'store' global untuk form lama
-        Route::post('/', [PenggunaanModulController::class,'storeGlobal'])->name('store');
+        // store global (form lama)
+        Route::post('/', [PenggunaanModulController::class, 'storeGlobal'])->name('store');
 
-        Route::get('/{penggunaan_modul}/edit', [PenggunaanModulController::class,'edit'])->name('edit');
-        Route::put('/{penggunaan_modul}', [PenggunaanModulController::class,'update'])->name('update');
-        Route::post('/{pm}/use', [PenggunaanModulController::class,'useNow'])->name('use');
-        Route::patch('/{pm}/status',[PenggunaanModulController::class,'updateStatus'])->name('status');
-        Route::post('/{pm}/start',  [PenggunaanModulController::class,'start'])->name('start');
-        Route::post('/{pm}/done',   [PenggunaanModulController::class,'done'])->name('done');
-        Route::post('/{pm}/reopen', [PenggunaanModulController::class,'reopen'])->name('reopen');
-        Route::delete('/{penggunaan_modul}', [PenggunaanModulController::class,'destroy'])->name('destroy');
-        Route::get ('/trash', [PenggunaanModulController::class,'trash'])->name('trash');
-        Route::post ('/{id}/restore', [PenggunaanModulController::class,'restore'])->name('restore');
-        Route::delete('/{id}/force', [PenggunaanModulController::class,'forceDelete'])
+        Route::get('/{penggunaan_modul}/edit', [PenggunaanModulController::class, 'edit'])->name('edit');
+        Route::put('/{penggunaan_modul}', [PenggunaanModulController::class, 'update'])->name('update');
+        Route::post('/{pm}/use', [PenggunaanModulController::class, 'useNow'])->name('use');
+        Route::patch('/{pm}/status', [PenggunaanModulController::class, 'updateStatus'])->name('status');
+        Route::post('/{pm}/start',  [PenggunaanModulController::class, 'start'])->name('start');
+        Route::post('/{pm}/done',   [PenggunaanModulController::class, 'done'])->name('done');
+        Route::post('/{pm}/reopen', [PenggunaanModulController::class, 'reopen'])->name('reopen');
+        Route::delete('/{penggunaan_modul}', [PenggunaanModulController::class, 'destroy'])->name('destroy');
+        Route::get('/trash', [PenggunaanModulController::class, 'trash'])->name('trash');
+        Route::post('/{id}/restore', [PenggunaanModulController::class, 'restore'])->name('restore');
+        Route::delete('/{id}/force', [PenggunaanModulController::class, 'forceDelete'])
             ->middleware('role:admin')->name('force');
+
+        // Batch (benar, tanpa dobel prefix/name)
+        Route::get('batch',  [PenggunaanModulController::class, 'createBatch'])->name('batch-form');
+        Route::post('batch', [PenggunaanModulController::class, 'storeBatch'])->name('batch-store');
     });
 
     // --- Account (force change password) ---
@@ -125,24 +146,24 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/{master}', [MasterSekolahController::class, 'update'])->name('update');
 
         // Soft delete
-        Route::delete('/{master}', [MasterSekolahController::class,'destroy'])->name('destroy');
-        Route::get('/trash', [MasterSekolahController::class,'trash'])->name('trash');
-        Route::post('/{id}/restore', [MasterSekolahController::class,'restore'])->name('restore');
-        Route::delete('/{id}/force', [MasterSekolahController::class,'forceDelete'])
+        Route::delete('/{master}', [MasterSekolahController::class, 'destroy'])->name('destroy');
+        Route::get('/trash', [MasterSekolahController::class, 'trash'])->name('trash');
+        Route::post('/{id}/restore', [MasterSekolahController::class, 'restore'])->name('restore');
+        Route::delete('/{id}/force', [MasterSekolahController::class, 'forceDelete'])
             ->middleware('role:admin')->name('force'); // admin-only
 
         // stage & klien
-        Route::patch('/{master}/stage', [MasterSekolahController::class,'updateStage'])->name('stage.update');
-        Route::post('/{master}/jadikan-prospek', [MasterSekolahController::class,'jadikanProspek'])->name('jadikan-prospek');
-        Route::post('/{master}/jadikan-klien', [MasterSekolahController::class,'jadikanKlien'])->name('jadikan-klien');
+        Route::patch('/{master}/stage', [MasterSekolahController::class, 'updateStage'])->name('stage.update');
+        Route::post('/{master}/jadikan-prospek', [MasterSekolahController::class, 'jadikanProspek'])->name('jadikan-prospek');
+        Route::post('/{master}/jadikan-klien', [MasterSekolahController::class, 'jadikanKlien'])->name('jadikan-klien');
 
         // MOU
         Route::get('/{master}/mou', [MouController::class, 'form'])->name('mou.form');
         Route::post('/{master}/mou', [MouController::class, 'save'])->name('mou.save');
 
         // Aktivitas
-        Route::get('/{master}/aktivitas', [AktivitasController::class,'index'])->name('aktivitas.index');
-        Route::post('/{master}/aktivitas', [AktivitasController::class,'store'])->name('aktivitas.store');
+        Route::get('/{master}/aktivitas', [AktivitasController::class, 'index'])->name('aktivitas.index');
+        Route::post('/{master}/aktivitas', [AktivitasController::class, 'store'])->name('aktivitas.store');
         // PER-SEKOLAH bulk
         Route::post('/{master}/aktivitas/bulk', [AktivitasController::class, 'bulkPerSekolah'])->name('aktivitas.bulk');
 
@@ -153,8 +174,8 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/{master}/aktivitas/{aktivitas}/force', [AktivitasController::class, 'forceDelete'])
             ->middleware('role:admin')->name('aktivitas.force'); // admin-only
 
-        // Attach PenggunaanModul via master (sesuai signature controller)
-        Route::post('/{master}/penggunaan', [PenggunaanModulController::class,'store'])->name('penggunaan.store');
+        // Attach PenggunaanModul via master
+        Route::post('/{master}/penggunaan', [PenggunaanModulController::class, 'store'])->name('penggunaan.store');
     });
 
     // --- Aktivitas Global ---
@@ -172,7 +193,6 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/{master}/{pm}/toggle', [ProgressModulController::class, 'toggle'])->name('toggle');
         Route::post('/{master}/{modul}/attach', [ProgressModulController::class, 'attach'])->name('attach');
         Route::post('/{master}/{pm}/dates', [ProgressModulController::class, 'updateDates'])->name('updateDates');
-        // (hapus rute delete/trash/restore/force di sini agar tidak duplikat dengan penggunaan-modul)
     });
 
     // --- Aktivitas File ---
@@ -182,10 +202,10 @@ Route::middleware(['auth'])->group(function () {
 
     // --- Users & Logs (admin-only) ---
     Route::middleware(['role:admin'])->group(function () {
-        Route::resource('users', UserController::class)->only(['index','update','store']);
+        Route::resource('users', UserController::class)->only(['index', 'update', 'store']);
         Route::post('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
 
-        Route::get('/logs', [LogController::class,'index'])->name('logs.index');
+        Route::get('/logs', [LogController::class, 'index'])->name('logs.index');
 
         Route::prefix('admin/users')->name('admin.users.')->group(function () {
             Route::get('/', [UserAdminController::class, 'index'])->name('index');
