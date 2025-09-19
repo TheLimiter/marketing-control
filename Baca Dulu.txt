@@ -1,0 +1,5 @@
+Demo-able version of this website.
+masih acak-acakan tapi seenggaknya bisa dijalanin heheh
+requirement : Seed,Schedulee, Npm
+
+note : Jangan ketawa Liat Migrationnya....dan barisan Css-nya juga wkwk
