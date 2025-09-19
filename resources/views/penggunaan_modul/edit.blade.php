@@ -137,7 +137,7 @@
   </div>
 </form>
 
-{{-- helper durasi → tanggal akhir --}}
+{{-- helper durasi tanggal akhir --}}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const dur = document.getElementById('durasi_hari');

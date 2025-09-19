@@ -36,7 +36,7 @@ $toggle = request('dir','desc')==='desc' ? 'asc' : 'desc';
 <div class="field">
 <label class="form-label">Klien</label>
 <select name="master_sekolah_id" class="select-soft">
-<option value="">— semua —</option>
+<option value="">semua</option>
 @foreach($sekolah as $s)
 <option value="{{ $s->id }}" {{ (string)(request('master_sekolah_id') ?? '')===(string)$s->id ? 'selected' : '' }}>
 {{ $s->nama_sekolah }}
@@ -47,7 +47,7 @@ $toggle = request('dir','desc')==='desc' ? 'asc' : 'desc';
 <div class="field">
 <label class="form-label">Status</label>
 <select name="status" class="select-soft">
-<option value="">— semua —</option>
+<option value="">semua</option>
 @foreach(['lunas','sebagian','draft'] as $s)
 <option value="{{ $s }}" {{ (request('status') ?? '')===$s ? 'selected' : '' }}>{{ ucwords($s) }}</option>
 @endforeach
@@ -183,7 +183,7 @@ onsubmit="return confirm('Hapus tagihan ini?')">
 <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2">
 <div class="small text-muted">
 @if(method_exists($items ?? null,'firstItem'))
-Menampilkan {{ $items->firstItem() }}–{{ $items->lastItem() }} dari {{ $items->total() }} data
+Menampilkan {{ $items->firstItem() }}{{ $items->lastItem() }} dari {{ $items->total() }} data
 @endif
 </div>
 {{ ($items ?? null)?->appends(request()->query())->links() }}

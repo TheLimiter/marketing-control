@@ -8,10 +8,10 @@ return new class extends Migration {
     public function up(): void {
         Schema::table('penggunaan_modul', function (Blueprint $t) {
             if (!Schema::hasColumn('penggunaan_modul','pengguna_nama')) {
-                $t->string('pengguna_nama',120)->nullable()->after('modul_id');
+                $t->string('pengguna_nama',120)->nullable();
             }
             if (!Schema::hasColumn('penggunaan_modul','pengguna_kontak')) {
-                $t->string('pengguna_kontak',120)->nullable()->after('pengguna_nama');
+                $t->string('pengguna_kontak',120)->nullable();
             }
         });
     }

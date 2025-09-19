@@ -20,7 +20,7 @@ class NotifikasiController extends Controller
         ]);
         $data['status'] = 'Antri';
         Notifikasi::create($data);
-        // Integrasi pengiriman (queue) bisa ditambahkan nanti
+        // Integrasi pengiriman (queue)
         return back()->with('ok','Notifikasi dibuat (status: Antri)');
     }
 }

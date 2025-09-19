@@ -8,16 +8,17 @@ return new class extends Migration {
     public function up(): void {
         Schema::table('master_sekolah', function (Blueprint $table) {
             if (!Schema::hasColumn('master_sekolah', 'mou_path')) {
-                $table->string('mou_path')->nullable()->after('stage_changed_at');
+                $table->string('mou_path')->nullable();
             }
             if (!Schema::hasColumn('master_sekolah', 'ttd_status')) {
-                $table->boolean('ttd_status')->default(false)->after('mou_path');
+                $table->boolean('ttd_status')->default(false);
             }
             if (!Schema::hasColumn('master_sekolah', 'mou_catatan')) {
-                $table->text('mou_catatan')->nullable()->after('ttd_status');
+                $table->text('mou_catatan')->nullable();
             }
         });
     }
+
     public function down(): void {
         Schema::table('master_sekolah', function (Blueprint $table) {
             if (Schema::hasColumn('master_sekolah', 'mou_catatan')) $table->dropColumn('mou_catatan');

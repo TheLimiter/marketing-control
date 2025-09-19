@@ -16,7 +16,7 @@
         <div class="toolbar">
             <div class="field flex-grow-1" style="min-width:320px">
                 <label>Cari nama modul</label>
-                <input type="text" name="q" class="input-soft" value="{{ request('q') }}" placeholder="Ketik nama modul…">
+                <input type="text" name="q" class="input-soft" value="{{ request('q') }}" placeholder="Ketik nama modul">
             </div>
             <div class="ms-auto d-flex align-items-end">
                 <button class="btn btn-primary round">
@@ -36,6 +36,7 @@
                         <th style="width:30%;">Nama</th>
                         <th style="width:20%;">Kategori</th>
                         <th style="width:10%;">Versi</th>
+                        <th style="width:12%;">Harga</th>
                         <th style="width:10%;">Status</th>
                         <th class="text-end" style="width:20%;">Aksi</th>
                     </tr>
@@ -44,9 +45,18 @@
                     @forelse($items as $m)
                         <tr>
                             <td>{{ $m->kode }}</td>
-                            <td>{{ $m->nama }}</td>
+                            <td>
+                            <a href="{{ route('modul.show', $m->id) }}" class="text-decoration-none fw-semibold">
+                                {{ $m->nama }}
+                            </a>
+                            </td>
                             <td>{{ $m->kategori }}</td>
                             <td>{{ $m->versi }}</td>
+                            <td>
+  @php $h = $m->harga_default ?? null; @endphp
+  {{ is_null($h) ? '—' : 'Rp '.number_format((float)$h, 0, ',', '.') }}
+</td>
+
                             <td>
                                 <span class="badge {{ $m->aktif ? 'badge-stage klien' : 'badge-stage secondary' }}">
                                     {{ $m->aktif ? 'Aktif' : 'Tidak' }}

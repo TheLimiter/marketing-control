@@ -19,13 +19,13 @@ return new class extends Migration {
             $table->string('pengguna_nama', 120)->nullable();
             $table->string('pengguna_kontak', 120)->nullable();
 
-            // Periode pemakaian (SINKRON dengan kode)
+            // Periode pemakaian
             $table->date('mulai_tanggal');
             $table->date('akhir_tanggal')->nullable();
 
             // Lisensi & status
             $table->boolean('is_official')->default(false);
-            $table->string('status', 20)->default('active'); // active|paused|ended
+            $table->string('status', 20)->default('active'); // <- tetap 'active'
 
             // Info lain
             $table->timestamp('last_used_at')->nullable();
@@ -35,7 +35,9 @@ return new class extends Migration {
 
             $table->timestamps();
 
-            // Tiap sekolah hanya 1 baris per modul
+            $table->softDeletes();
+
+            // Satu baris per (sekolah, modul)
             $table->unique(['master_sekolah_id','modul_id']);
         });
     }

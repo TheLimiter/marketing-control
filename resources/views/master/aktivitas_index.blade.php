@@ -14,6 +14,9 @@
         'whatsapp' => 'success',
         'email' => 'secondary',
         'lainnya' => 'light',
+        'billing_payment' => 'success',
+        'billing_create'  => 'secondary',
+
     ];
     $perJenis = $items->getCollection()->groupBy('jenis')->map->count();
     $toggle = request('dir', 'desc') === 'desc' ? 'asc' : 'desc' ;
@@ -43,25 +46,25 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <div class="h-page">Log Aktivitas</div>
-            <div class="subtle">Aktivitas • {{ $master->nama_sekolah }}</div>
+            <div class="subtle">Aktivitas {{ $master->nama_sekolah }}</div>
         </div>
 
         <div class="d-flex gap-2">
             <a href="{{ route('master.index') }}" class="btn btn-ghost round">
                 <i class="bi bi-arrow-left me-1"></i> Kembali
             </a>
-            @if(empty($showTrash))
-                <a href="{{ route('master.aktivitas.trash', $master->id) }}" class="btn btn-outline-secondary round">
-                    <i class="bi bi-trash me-1"></i> Riwayat Terhapus
-                </a>
-                <button class="btn btn-primary round" data-bs-toggle="offcanvas" data-bs-target="#ocNew">
-                    <i class="bi bi-plus-lg me-1"></i> Tambah Aktivitas
-                </button>
+            @if(!($showTrash ?? false))
+              <a href="{{ route('master.aktivitas.trash', $master->id) }}" class="btn btn-outline-danger round">
+                <i class="bi bi-trash3 me-1"></i> Riwayat terhapus
+              </a>
             @else
-                <a href="{{ route('master.aktivitas.index', $master->id) }}" class="btn btn-outline-secondary round">
-                    <i class="bi bi-box-arrow-left me-1"></i> Kembali ke Log
-                </a>
+              <a href="{{ route('master.aktivitas.index', $master->id) }}" class="btn btn-ghost round">
+                <i class="bi bi-arrow-left me-1"></i> Kembali
+              </a>
             @endif
+            <button class="btn btn-primary round" data-bs-toggle="offcanvas" data-bs-target="#ocNew">
+                <i class="bi bi-plus-lg me-1"></i> Tambah Aktivitas
+            </button>
         </div>
     </div>
 
@@ -69,22 +72,24 @@
         {{-- Filter Toolbar --}}
         <form method="get" id="filterFormSchool" class="card card-toolbar mb-4">
             <div class="toolbar">
-                <div class="field" style="min-width:140px">
-                    <label>Dari</label>
-                    <input type="date" name="from" value="{{ request('from') }}" class="input-soft">
-                </div>
-                <div class="field" style="min-width:140px">
-                    <label>Sampai</label>
-                    <input type="date" name="to" value="{{ request('to') }}" class="input-soft">
+                <div class="d-flex gap-2 align-items-end">
+                    <div class="field" style="min-width:140px">
+                        <label>Dari</label>
+                        <input type="date" name="from" value="{{ request('from') }}" class="input-soft">
+                    </div>
+                    <div class="field" style="min-width:140px">
+                        <label>Sampai</label>
+                        <input type="date" name="to" value="{{ request('to') }}" class="input-soft">
+                    </div>
                 </div>
                 <div class="field" style="min-width:180px">
                     <label>Jenis</label>
-                    <input type="text" name="jenis" value="{{ request('jenis') }}" class="input-soft" placeholder="Ketik jenis…">
+                    <input type="text" name="jenis" value="{{ request('jenis') }}" class="input-soft" placeholder="Ketik jenis">
                 </div>
 
                 <div class="field" style="min-width:200px">
                     <label>Oleh</label>
-                    <input type="text" name="oleh" value="{{ request('oleh') }}" class="input-soft" placeholder="Nama user…" list="dl-oleh">
+                    <input type="text" name="oleh" value="{{ request('oleh') }}" class="input-soft" placeholder="Nama user" list="dl-oleh">
                     @isset($creatorOptions)
                         <datalist id="dl-oleh">
                             @foreach($creatorOptions as $n)
@@ -96,7 +101,7 @@
 
                 <div class="field flex-grow-1" style="min-width:260px">
                     <label>Cari</label>
-                    <input name="q" value="{{ request('q') }}" class="input-soft" placeholder="Hasil atau catatan…">
+                    <input name="q" value="{{ request('q') }}" class="input-soft" placeholder="Hasil atau catatan">
                 </div>
                 <div class="field" style="min-width:120px">
                     <label>Per halaman</label>
@@ -169,15 +174,20 @@
                                 @endif
                             </td>
                             <td>
-                                <div class="fw-medium">{{ optional($it->tanggal)->format('d M Y') ?: '—' }}</div>
+                                <div class="fw-medium">{{ optional($it->tanggal)->format('d M Y') ?: '-' }}</div>
                                 <div class="text-muted small">{{ optional($it->created_at)->diffForHumans() }}</div>
+                                @if(($showTrash ?? false) && $it->deleted_at)
+                                  <div class="small text-danger">Deleted {{ $it->deleted_at->diffForHumans() }}</div>
+                                @endif
                             </td>
                             <td>
                                 <span class="badge rounded-pill text-bg-{{ $badge[$k] ?? 'secondary' }}">{{ strtoupper($it->jenis ?? 'LAINNYA') }}</span>
                             </td>
                             <td class="fw-medium">
                                 {{ $it->hasil }}
-                                @php $fc = $it->files->count(); @endphp
+                                @php
+                                    $fc = ($it->files->count() ?? 0) + ($it->paymentFiles->count() ?? 0);
+                                @endphp
                                 @if($fc)
                                     <details class="d-inline-block align-middle">
                                         <summary class="badge rounded-pill text-bg-secondary border-0"
@@ -185,14 +195,29 @@
                                             <i class="bi bi-paperclip me-1"></i> {{ $fc }}
                                         </summary>
                                         <ul class="list-unstyled small mb-0 mt-1">
+                                            {{-- Lampiran aktivitas biasa --}}
                                             @foreach($it->files as $f)
                                                 <li class="d-flex align-items-center gap-2">
                                                     <a href="{{ route('aktivitas.file.download', $f->id) }}">{{ $f->original_name }}</a>
-                                                    <span class="text-muted">({{ number_format($f->size/1024,1) }} KB)</span>
-                                                    @if(Str::startsWith($f->mime, 'image/'))
-                                                        <button type="button" class="btn btn-sm btn-outline-secondary add-btn" onclick="previewImage(@json(route('aktivitas.file.preview', $f->id)), @json($f->original_name))">
+                                                    <span class="text-muted">({{ number_format(($f->size ?? 0)/1024,1) }} KB)</span>
+                                                    @if(Str::startsWith((string) $f->mime, 'image/'))
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary add-btn"
+                                                                onclick="previewImage(@json(route('aktivitas.file.preview', $f->id)), @json($f->original_name))">
                                                             <i class="bi bi-eye"></i>
                                                         </button>
+                                                    @endif
+                                                </li>
+                                            @endforeach
+
+                                            {{-- Bukti pembayaran --}}
+                                            @foreach($it->paymentFiles as $bf)
+                                                <li class="d-flex align-items-center gap-2">
+                                                    <a href="{{ asset('storage/'.$bf->path) }}" target="_blank">{{ $bf->original_name }}</a>
+                                                    <span class="text-muted">({{ number_format(($bf->size ?? 0)/1024,1) }} KB)</span>
+                                                    @if(Str::startsWith((string) $bf->mime, 'image/'))
+                                                        <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ asset('storage/'.$bf->path) }}">
+                                                            <i class="bi bi-eye"></i>
+                                                        </a>
                                                     @endif
                                                 </li>
                                             @endforeach
@@ -200,29 +225,39 @@
                                     </details>
                                 @endif
                             </td>
-                            <td class="text-muted small">{!! $it->catatan ? nl2br(e(Str::limit($it->catatan,180))) : '—' !!}</td>
-                            <td class="small">{{ optional($it->creator)->name ?? '—' }}</td>
+                            <td class="text-muted small">{!! $it->catatan ? nl2br(e(Str::limit($it->catatan,180))) : '-' !!}</td>
+                            <td class="small">{{ optional($it->creator)->name ?? '-' }}</td>
                             <td class="text-end text-nowrap">
                                 @if(!empty($showTrash))
-                                    <form class="d-inline" method="post" action="{{ route('master.aktivitas.restore', [$master->id, $it->id]) }}">
-                                        @csrf @method('PATCH')
-                                        <button class="btn btn-sm btn-success round" onclick="return confirm('Pulihkan aktivitas ini?')">
-                                            <i class="bi bi-arrow-counterclockwise me-1"></i> Pulihkan
-                                        </button>
-                                    </form>
-                                    <form class="d-inline" method="post" action="{{ route('master.aktivitas.force', [$master->id, $it->id]) }}">
-                                        @csrf @method('DELETE')
-                                        <button class="btn btn-sm btn-outline-danger round" onclick="return confirm('Hapus permanen? Tindakan ini tidak bisa dibatalkan.')">
-                                            <i class="bi bi-x-circle me-1"></i> Hapus
-                                        </button>
-                                    </form>
+                                        {{-- Pulihkan --}}
+                                        <form method="post" action="{{ route('master.aktivitas.restore', [$master->id, $it->id]) }}" class="d-inline">
+                                            @csrf
+                                            @method('PATCH')
+                                            <button class="btn btn-sm btn-success round">
+                                                <i class="bi bi-arrow-counterclockwise"></i> Pulihkan
+                                            </button>
+                                        </form>
+
+                                        {{-- Hapus permanen --}}
+                                        @if(auth()->user()?->hasRole('admin'))
+                                            <form method="post"
+                                                  action="{{ route('master.aktivitas.force', [$master->id, $it->id]) }}"
+                                                  class="d-inline"
+                                                  onsubmit="return confirm('Hapus permanen item ini? Tindakan tidak bisa dibatalkan.')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button class="btn btn-sm btn-outline-danger round">
+                                                    <i class="bi bi-x-circle"></i> Hapus permanen
+                                                </button>
+                                            </form>
+                                        @endif
                                 @else
-                                    <form action="{{ route('master.aktivitas.destroy', [$master->id, $it->id]) }}" method="post" onsubmit="return confirm('Hapus aktivitas ini?')">
-                                        @csrf @method('DELETE')
-                                        <button class="btn btn-sm btn-outline-danger round">
-                                            <i class="bi bi-trash me-1"></i> Hapus
-                                        </button>
-                                    </form>
+                                        <form action="{{ route('master.aktivitas.destroy', [$master->id, $it->id]) }}" method="post" onsubmit="return confirm('Hapus aktivitas ini?')">
+                                            @csrf @method('DELETE')
+                                            <button class="btn btn-sm btn-outline-danger round">
+                                                <i class="bi bi-trash me-1"></i> Hapus
+                                            </button>
+                                        </form>
                                 @endif
                             </td>
                         </tr>
@@ -238,7 +273,7 @@
             <form id="bulkForm" method="post" action="{{ route('master.aktivitas.bulk', $master->id) }}" class="d-flex flex-wrap gap-2 align-items-center p-3 border-top">
                 @csrf
                 <select name="action" class="select-soft" style="width:auto">
-                    <option value="" selected>Aksi massal…</option>
+                    <option value="" selected>Aksi massal</option>
                     <option value="delete">Hapus terpilih</option>
                     <option value="export">Export CSV terpilih</option>
                 </select>
@@ -295,7 +330,7 @@
                 <div class="field">
                     <label for="files">Lampiran (opsional)</label>
                     <input id="files" type="file" name="files[]" class="form-control" multiple>
-                    <div class="form-text">jpg, png, webp, pdf, doc/x, xls/x, ppt/x • maks 5MB/file</div>
+                    <div class="form-text">jpg, png, webp, pdf, doc/x, xls/x, ppt/x maks 5MB/file</div>
                 </div>
 
                 <div class="d-flex gap-2 mt-3">

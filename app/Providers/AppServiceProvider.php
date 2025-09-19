@@ -17,14 +17,27 @@ use App\Models\MasterSekolah;
 
 class AppServiceProvider extends ServiceProvider
 {
+    /**
+     * Register any application services.
+     */
     public function register(): void
     {
-        $helpers = base_path('app/Support/activity_helpers.php');
-        if (is_file($helpers)) {
-            require_once $helpers;
+        // load ActivityHelper (format baru, pakai ActivityLogger)
+        $file = base_path('app/Support/ActivityHelper.php');
+        if (is_file($file)) {
+            require_once $file;
+        }
+
+        // (opsional) load activity.php yg isi fungsi write_activity lama (tidak bentrok nama)
+        $legacy = base_path('app/Support/activity.php');
+        if (is_file($legacy)) {
+            require_once $legacy;
         }
     }
 
+    /**
+     * Bootstrap any application services.
+     */
     public function boot(): void
     {
         if (class_exists(TagihanKlien::class)) {
@@ -53,11 +66,11 @@ class AppServiceProvider extends ServiceProvider
                 ];
             } catch (\Throwable $e) {
                 $navStats = [
-                    'prospek' => 0,
-                    'negosiasi' => 0,
-                    'mou' => 0,
-                    'klien' => 0,
-                    'klienNoMou' => 0,
+                    'prospek'      => 0,
+                    'negosiasi'    => 0,
+                    'mou'          => 0,
+                    'klien'        => 0,
+                    'klienNoMou'   => 0,
                     'aktivitasNow' => 0,
                 ];
             }

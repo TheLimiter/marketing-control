@@ -30,7 +30,7 @@
                 <tr>
                     <td>{{ $items->firstItem() + $loop->index }}</td>
                     <td>{{ $k->nama }}</td>
-                    <td>{{ $k->tanggal_mou ?? '—' }}</td>
+                    <td>{{ $k->tanggal_mou ?? 'â€”' }}</td>
                     <td>{{ ($k->status_ttd === 'sudah' || $k->status_ttd == 1) ? 'Sudah' : 'Belum' }}</td>
                     <td class="text-end">
                         <a href="{{ route('klien.edit', $k) }}" class="btn btn-sm btn-warning">Edit</a>

@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{CalonKlien, MasterSekolah}; // Tambahkan MasterSekolah
+use App\Models\{CalonKlien, MasterSekolah};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -18,7 +18,7 @@ class CalonKlienController extends Controller
     {
         $q = trim((string) $request->get('q', ''));
 
-        // Menggunakan query dari MasterSekolah dengan status 'calon'
+        // Menggunakan query dari MasterSekolah'calon'
         $calon = MasterSekolah::query()
             ->when($q !== '', function ($w) use ($q) {
                 $w->where('nama_sekolah', 'like', "%{$q}%")

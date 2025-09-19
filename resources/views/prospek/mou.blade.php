@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<h4 class="mb-3">MOU Prospek: {{ $prospek->calon->nama ?? '—' }} (#{{ $prospek->id }})</h4>
+<h4 class="mb-3">MOU Prospek: {{ $prospek->calon->nama ?? 'â€”' }} (#{{ $prospek->id }})</h4>
 
 @if(session('ok'))    <div class="alert alert-success">{{ session('ok') }}</div> @endif
 @if(session('error')) <div class="alert alert-danger">{{ session('error') }}</div> @endif

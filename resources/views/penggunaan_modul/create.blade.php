@@ -29,7 +29,7 @@
           <div class="mb-3">
             <label class="form-label">Sekolah <span class="text-danger">*</span></label>
             <select class="form-select select-soft" name="master_sekolah_id" required>
-              <option value="">Pilih sekolah…</option>
+              <option value="">Pilih sekolah</option>
               @foreach($sekolah as $s)
                 <option value="{{ $s->id }}" @selected(old('master_sekolah_id')==$s->id)>{{ $s->nama_sekolah }}</option>
               @endforeach
@@ -40,7 +40,7 @@
           <div class="mb-3">
             <label class="form-label">Modul <span class="text-danger">*</span></label>
             <select class="form-select select-soft" name="modul_id" required>
-              <option value="">Pilih modul…</option>
+              <option value="">Pilih modul</option>
               @foreach($modul as $m)
                 <option value="{{ $m->id }}" @selected(old('modul_id')==$m->id)>{{ $m->nama }}</option>
               @endforeach
@@ -117,7 +117,7 @@
   </div>
 </form>
 
-{{-- Durasi → tanggal akhir (inklusif) + guard --}}
+{{-- Durasi tanggal akhir (inklusif) + guard --}}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const dur = document.getElementById('durasi_hari');

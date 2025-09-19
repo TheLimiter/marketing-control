@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\Mou;
+use Illuminate\Support\Arr;
 
 class MouObserver
 {
@@ -17,7 +18,18 @@ class MouObserver
 
     public function updated(Mou $m): void
     {
-        log_activity('mou.update', $m, [], ['id' => $m->id], $m->master_sekolah_id, 'MOU diperbarui');
+        $dirty   = array_keys($m->getDirty());
+        $watched = ['file_name','file_path','tanggal_mou','keterangan'];
+        $changed = array_values(array_intersect($dirty, $watched));
+
+        if (!empty($changed)) {
+            log_activity('mou.update', $m,
+                Arr::only($m->getOriginal(), $changed),
+                Arr::only($m->getAttributes(), $changed),
+                $m->master_sekolah_id,
+                'MOU diperbarui'
+            );
+        }
     }
 
     public function deleted(Mou $m): void

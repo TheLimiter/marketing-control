@@ -41,7 +41,7 @@
           <div class="col-md-6">
             <label class="form-label">Jumlah Siswa</label>
             <input type="number" name="jumlah_siswa" class="form-control"
-                   min="0" step="10" inputmode="numeric"
+                   min="0" inputmode="numeric"
                    placeholder="Contoh: 650"
                    value="{{ old('jumlah_siswa', $row->jumlah_siswa ?? '') }}">
           </div>
@@ -83,12 +83,12 @@
 
         <div class="mb-3">
           <label class="form-label">Alamat</label>
-          <textarea name="alamat" rows="3" class="form-control" placeholder="Nama jalan, kecamatan, kota/kabupaten…">{{ old('alamat', $row->alamat ?? '') }}</textarea>
+          <textarea name="alamat" rows="3" class="form-control" placeholder="Nama jalan, kecamatan, kota/kabupaten">{{ old('alamat', $row->alamat ?? '') }}</textarea>
         </div>
 
         <div class="mb-3">
           <label class="form-label">Tindak Lanjut</label>
-          <textarea name="tindak_lanjut" rows="2" class="form-control" placeholder="Rencana follow-up berikutnya…">{{ old('tindak_lanjut', $row->tindak_lanjut ?? '') }}</textarea>
+          <textarea name="tindak_lanjut" rows="2" class="form-control" placeholder="Rencana follow-up berikutnya">{{ old('tindak_lanjut', $row->tindak_lanjut ?? '') }}</textarea>
           <div class="form-text mt-1">Rencana ke depan atau follow-up yang perlu dilakukan terhadap sekolah.</div>
         </div>
 
@@ -97,7 +97,7 @@
             <span>Catatan</span>
             <small class="text-muted"><span id="catatan-count">0</span> karakter</small>
           </label>
-          <textarea id="catatan" name="catatan" rows="5" class="form-control" placeholder="Ringkasan call/visit, komitmen, hal khusus…">{{ old('catatan', $row->catatan ?? '') }}</textarea>
+          <textarea id="catatan" name="catatan" rows="5" class="form-control" placeholder="Ringkasan call/visit, komitmen, hal khusus">{{ old('catatan', $row->catatan ?? '') }}</textarea>
         </div>
 
         <div class="text-muted small">

@@ -181,7 +181,7 @@
             <div class="card">
                 <div class="card-body">
                     <div class="eyebrow">Catatan</div>
-                    <div class="subtle">Selamat bekerja! Cek pipeline & tagihan yang mendekati jatuh tempo 👀</div>
+                    <div class="subtle">Selamat bekerja! Cek pipeline & tagihan yang mendekati jatuh tempo</div>
                 </div>
             </div>
         </div>
@@ -189,51 +189,19 @@
 
     {{-- Recent activities --}}
     <div class="card card-toolbar p-0">
-        <div class="card-header border-0 bg-transparent p-3 d-flex justify-content-between align-items-center">
-            <div class="h-section mb-0">
-                <i class="bi bi-clock-history text-muted"></i>
-                <span>Aktivitas Terbaru</span>
-            </div>
+      <div class="card-header border-0 bg-transparent p-3 d-flex justify-content-between align-items-center">
+        <div class="h-section mb-0">
+          <i class="bi bi-clock-history text-muted"></i>
+          <span>Aktivitas Terbaru</span>
+        </div>
 
-            <a href="{{ route('aktivitas.index') }}" class="link-action">
-                Semua Aktivitas
-                <i class="bi bi-arrow-right"></i>
-            </a>
-        </div>
-        <div class="table-responsive">
-            <table class="table table-modern table-sm align-middle mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th style="width:160px" class="text-nowrap">Tanggal</th>
-                        <th>Sekolah</th>
-                        <th style="width:140px">Jenis</th>
-                        <th style="width:220px">Hasil</th>
-                        <th>Catatan</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($recent as $r)
-                        <tr>
-                            <td class="text-nowrap">{{ \Carbon\Carbon::parse($r->tanggal)->format('d/m/Y H:i') }}</td>
-                            <td>
-                                <a href="{{ route('master.aktivitas.index', $r->master_sekolah_id) }}" class="text-decoration-none">
-                                    {{ $r->master->nama_sekolah ?? '-' }}
-                                </a>
-                            </td>
-                            <td>
-                                <span class="badge badge-stage {{ $r->badge_class }}">
-                                    {{ $r->display_jenis ?? strtoupper($r->jenis) }}
-                                </span>
-                            </td>
-                            <td class="fw-medium">{{ $r->display_hasil ?? ($r->hasil ?? '—') }}</td>
-                            <td class="text-muted small">{{ \Illuminate\Support\Str::limit($r->catatan ?? '—', 160) }}</td>
-                        </tr>
-                    @empty
-                        <tr><td colspan="5" class="text-center text-muted py-4">Belum ada aktivitas.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+        <a href="{{ route('aktivitas.index') }}" class="link-action">
+          Semua Aktivitas
+          <i class="bi bi-arrow-right"></i>
+        </a>
+      </div>
+
+      <x-activity-feed :items="$recent" :show-school="true" :show-catatan="true" :compact="true"/>
     </div>
 
     {{-- Legend / Keterangan Jenis Aktivitas --}}

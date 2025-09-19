@@ -4,16 +4,9 @@ namespace App\Services;
 
 use App\Models\ActivityLog;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Arr;
 
 class ActivityLogger
 {
-    /**
-     * Catat aktivitas ke tabel lama (entity_type/entity_id, action, before/after).
-     * $subject: model terkait (TagihanKlien, Mou, PenggunaanModul, MasterSekolah, dll)
-     * $schoolId: isi bila mau langsung scope ke sekolah (lebih cepat untuk feed per-sekolah)
-     *            Bila null, kita coba tebak dari $subject->master_sekolah_id atau $subject->id (kalau MasterSekolah).
-     */
     public static function record(
         string $action,
         ?Model $subject = null,
@@ -25,7 +18,7 @@ class ActivityLogger
         $entityType = $subject ? get_class($subject) : null;
         $entityId   = $subject?->getKey();
 
-        // tebak schoolId kalau belum diberikan
+        // Tebak schoolId bila null
         if ($schoolId === null && $subject) {
             if (isset($subject->master_sekolah_id)) {
                 $schoolId = (int) $subject->master_sekolah_id;
@@ -38,8 +31,8 @@ class ActivityLogger
         ActivityLog::create([
             'user_id'           => auth()->id(),
             'master_sekolah_id' => $schoolId,
-            'entity_type'       => $entityType ? $entityType : ($before['entity_type'] ?? null),
-            'entity_id'         => $entityId   ? $entityId   : ($before['entity_id'] ?? 0),
+            'entity_type'       => $entityType,
+            'entity_id'         => $entityId,
             'action'            => $action,
             'title'             => $title,
             'before'            => $before ?: null,
@@ -47,5 +40,18 @@ class ActivityLogger
             'ip'                => $req?->ip(),
             'user_agent'        => $req?->userAgent(),
         ]);
+    }
+
+    /** (opsional) alias agar backward-compat kalau sempat kepakai */
+    public static function write(array $payload): void
+    {
+        self::record(
+            $payload['action'] ?? 'unknown',
+            $payload['subject'] ?? null,
+            $payload['before'] ?? [],
+            $payload['after'] ?? [],
+            $payload['school_id'] ?? null,
+            $payload['title'] ?? null,
+        );
     }
 }

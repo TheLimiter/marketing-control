@@ -24,7 +24,7 @@
     {{-- HIGHLIGHT KOLOM: lokal saja --}}
     <style>
       .cell-warning, .cell-danger { position: relative; }
-      /* full-cell tint yang ringan + strip kiri agar “ke-notice” */
+      /* full-cell tint yang ringan + strip kiri agar ke-notice */
       .cell-warning { background: rgba(245,158,11,.10) !important; box-shadow: inset 4px 0 0 0 #f59e0b; }
       .cell-danger  { background: rgba(239,68,68,.12) !important; box-shadow: inset 4px 0 0 0 #ef4444; }
     </style>
@@ -33,7 +33,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <div class="h-page">Progress Modul Sekolah</div>
-            <div class="subtle">Monitoring • Status instalasi modul per sekolah</div>
+            <div class="subtle">Monitoring Status instalasi modul per sekolah</div>
         </div>
         <a href="{{ route('penggunaan-modul.create') }}" class="btn btn-primary round">
             <i class="bi bi-plus-lg me-1"></i> Tambah Penggunaan
@@ -70,15 +70,15 @@
         <div class="toolbar">
             <div class="field flex-grow-1" style="min-width:260px">
                 <label>Cari Sekolah</label>
-                <input type="text" name="q" value="{{ $search }}" class="input-soft" placeholder="Ketik nama sekolah…">
+                <input type="text" name="q" value="{{ $search }}" class="input-soft" placeholder="Ketik nama sekolah">
             </div>
             <div class="field" style="min-width:200px">
                 <label>Status</label>
                 <select name="status" class="select-soft">
                     <option value="">Semua Status</option>
                     <option value="done"    @selected($status==='done')>Selesai (100%)</option>
-                    <option value="ontrack" @selected($status==='ontrack')>On Track (≥75%)</option>
-                    <option value="berjalan"@selected($status==='berjalan')>Berjalan (≥25%)</option>
+                    <option value="ontrack" @selected($status==='ontrack')>On Track (75%)</option>
+                    <option value="berjalan"@selected($status==='berjalan')>Berjalan (25%)</option>
                     <option value="baru"    @selected($status==='baru')>Baru Mulai (>0%)</option>
                     <option value="belum"   @selected($status==='belum')>Belum Mulai (0%)</option>
                 </select>
@@ -86,12 +86,12 @@
             <div class="field" style="min-width:220px">
                 <label>Urutkan</label>
                 <select name="sort" class="select-soft">
-                    <option value="updated_desc"  @selected($sort==='updated_desc')>Update Terakhir ↓</option>
-                    <option value="updated_asc"   @selected($sort==='updated_asc')>Update Terakhir ↑</option>
-                    <option value="progress_desc" @selected($sort==='progress_desc')>Progress ↓</option>
-                    <option value="progress_asc"  @selected($sort==='progress_asc')>Progress ↑</option>
-                    <option value="school_asc"    @selected($sort==='school_asc')>Sekolah A→Z</option>
-                    <option value="school_desc"   @selected($sort==='school_desc')>Sekolah Z→A</option>
+                    <option value="updated_desc"  @selected($sort==='updated_desc')>Update Terakhir</option>
+                    <option value="updated_asc"   @selected($sort==='updated_asc')>Update Terakhir</option>
+                    <option value="progress_desc" @selected($sort==='progress_desc')>Progress</option>
+                    <option value="progress_asc"  @selected($sort==='progress_asc')>Progress</option>
+                    <option value="school_asc"    @selected($sort==='school_asc')>Sekolah A-Z</option>
+                    <option value="school_desc"   @selected($sort==='school_desc')>Sekolah Z-A</option>
                 </select>
             </div>
             <div class="field" style="min-width:150px">
@@ -133,8 +133,8 @@
                             $p = (int) ($r->progress_percent ?? 0);
                             [$label,$variant] = $statusBadge($p);
 
-                            $updatedHuman = $r->last_update ? Carbon::parse($r->last_update)->diffForHumans() : '—';
-                            $updatedExact = $r->last_update ? Carbon::parse($r->last_update)->format('d/m/Y H:i') : '—';
+                            $updatedHuman = $r->last_update ? Carbon::parse($r->last_update)->diffForHumans() : '-';
+                            $updatedExact = $r->last_update ? Carbon::parse($r->last_update)->format('d/m/Y H:i') : '-';
 
                             $isStale = $p < 100 && $r->last_update && Carbon::parse($r->last_update)->lt(now()->subDays(7));
 
@@ -147,13 +147,13 @@
                             <td>
                                 <div class="fw-semibold">
                                     <a href="{{ route('progress.show', ['master' => $masterId]) }}" class="text-decoration-none">
-                                        {{ $r->nama_sekolah ?? '—' }}
+                                        {{ $r->nama_sekolah ?? '-' }}
                                     </a>
                                 </div>
                                 <div class="small text-muted">
                                     <span class="badge rounded-pill text-bg-{{ $variant }}">{{ $label }}</span>
                                     @if(!empty($r->jenjang))
-                                        • <span class="small text-uppercase">{{ $r->jenjang }}</span>
+                                        <span class="small text-uppercase">{{ $r->jenjang }}</span>
                                     @endif
                                 </div>
                             </td>
@@ -189,7 +189,7 @@
                         <tr>
                             <td colspan="6">
                                 <div class="text-center py-5">
-                                    <div class="mb-2">📭</div>
+                                    <div class="mb-2">ðŸ“­</div>
                                     <div class="fw-semibold">Belum ada penggunaan modul.</div>
                                     <div class="text-muted small mb-3">Tambahkan penggunaan modul untuk mulai memantau progress sekolah.</div>
                                     <a href="{{ route('penggunaan-modul.create') }}" class="btn btn-sm btn-primary round">
@@ -206,7 +206,7 @@
 
     {{-- Pagination --}}
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
-        <div class="small text-muted">Menampilkan {{ $rows->firstItem() }}–{{ $rows->lastItem() }} dari {{ $rows->total() }} data</div>
+        <div class="small text-muted">Menampilkan {{ $rows->firstItem() }} - {{ $rows->lastItem() }} dari {{ $rows->total() }} data</div>
         <div>{{ $rows->appends(request()->query())->links() }}</div>
     </div>
 @endsection

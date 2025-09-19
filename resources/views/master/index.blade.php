@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @php
     // mapping stage -> label
@@ -157,7 +157,7 @@
 
                             {{-- Update time --}}
                             <td class="small text-muted text-nowrap">
-                                {{ optional($x->updated_at)->diffForHumans() ?? '—' }}
+                                {{ optional($x->updated_at)->diffForHumans() ?? '&mdash' }}
                             </td>
 
                             {{-- Aksi --}}
@@ -186,17 +186,17 @@
                                         data-bs-target="#schoolDetail"
                                         title="Detail sekolah"
                                         data-nama="{{ $x->nama_sekolah }}"
-                                        data-jenjang="{{ $x->jenjang ?? '—' }}"
-                                        data-alamat="{{ $x->alamat ?? '—' }}"
-                                        data-narahubung="{{ $x->narahubung ?? '—' }}"
-                                        data-nohp="{{ $x->no_hp ?? '—' }}"
-                                        data-sumber="{{ $x->sumber ?? '—' }}"
-                                        data-siswa="{{ $x->jumlah_siswa ?? '—' }}"
-                                        data-mou="{{ $mouAda ? 'Ada' : '—' }}"
-                                        data-ttd="{{ $x->ttd_status ? 'OK' : '—' }}"
+                                        data-jenjang="{{ $x->jenjang ?? '&mdash' }}"
+                                        data-alamat="{{ $x->alamat ?? '&mdash' }}"
+                                        data-narahubung="{{ $x->narahubung ?? '&mdash' }}"
+                                        data-nohp="{{ $x->no_hp ?? '&mdash' }}"
+                                        data-sumber="{{ $x->sumber ?? '&mdash' }}"
+                                        data-siswa="{{ $x->jumlah_siswa ?? '&mdash' }}"
+                                        data-mou="{{ $mouAda ? 'Ada' : '&mdash' }}"
+                                        data-ttd="{{ $x->ttd_status ? 'OK' : '&mdash' }}"
                                         data-stage="{{ $stageOptions[$x->stage] ?? '-' }}"
-                                        data-tindak="{{ $x->tindak_lanjut ?? '—' }}"
-                                        data-catatan="{{ $x->catatan ? \Illuminate\Support\Str::limit($x->catatan, 200) : '—' }}"
+                                        data-tindak="{{ $x->tindak_lanjut ?? '&mdash' }}"
+                                        data-catatan="{{ $x->catatan ? \Illuminate\Support\Str::limit($x->catatan, 200) : '&mdash' }}"
                                         data-created="{{ optional($x->created_at)->format('d/m/Y H:i') }}"
                                         data-updated="{{ optional($x->updated_at)->diffForHumans() }}"
                                         data-edit="{{ route('master.edit',$sid) }}"

@@ -1,6 +1,6 @@
 @extends('layouts.app')
 @section('content')
-<h5>MOU & TTD — {{ $master->nama_sekolah }}</h5>
+<h5>MOU & TTD â€” {{ $master->nama_sekolah }}</h5>
 @if(session('ok')) <div class="alert alert-success">{{ session('ok') }}</div> @endif
 @if($errors->any()) <div class="alert alert-danger">{{ $errors->first() }}</div> @endif
 

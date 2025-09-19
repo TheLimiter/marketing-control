@@ -18,9 +18,10 @@ use App\Http\Controllers\MouController;
 use App\Http\Controllers\AktivitasController;
 use App\Http\Controllers\AktivitasFileController;
 use App\Http\Controllers\ProgressModulController;
-
 use App\Http\Controllers\Admin\UserAdminController;
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\BillingPaymentFileController;
 
 use App\Models\Modul;
 use App\Models\PenggunaanModul;
@@ -29,7 +30,17 @@ use App\Models\TagihanKlien;
 // Redirect root URL to dashboard
 Route::get('/', fn () => redirect()->route('dashboard'));
 
-Route::middleware(['auth'])->group(function () {
+// === Auth (guest) ===
+Route::middleware('guest')->group(function () {
+    Route::get('/login',  [LoginController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:5,1');
+});
+
+// === Auth (logout) ===
+Route::post('/logout', [LoginController::class, 'logout'])->middleware('auth')->name('logout');
+
+
+Route::middleware(['auth','active'])->group(function () {
     // --- Dashboard ---
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
@@ -56,8 +67,6 @@ Route::middleware(['auth'])->group(function () {
         // Calon -> Prospek
         Route::post('{calon}/jadikan-prospek', [ProspekController::class, 'storeFromCalon'])->name('jadikan-prospek');
 
-        // Activity log (list)
-        Route::get('/activity', [ActivityLogController::class, 'index'])->name('activity.index');
     });
 
     // --- Prospek ---
@@ -82,6 +91,11 @@ Route::middleware(['auth'])->group(function () {
     Route::post('tagihan/{tagihan}/mark-paid', [TagihanController::class, 'markPaid'])->name('tagihan.markPaid');
     Route::post('tagihan/{tagihan}/mark-unpaid', [TagihanController::class, 'markUnpaid'])->name('tagihan.markUnpaid');
     Route::get('tagihan/{tagihan}/wa', [TagihanController::class, 'wa'])->name('tagihan.wa');
+
+    Route::get('/tagihan/hitung', [TagihanController::class,'hitung'])->name('tagihan.hitung');
+    Route::get('/tagihan/assigned-modules', [TagihanController::class,'assignedModules'])->name('tagihan.assigned');
+
+
 
     // Laporan & notifikasi
     Route::get('tagihan/laporan', [TagihanController::class, 'laporan'])->name('tagihan.laporan');
@@ -117,7 +131,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/{pm}/use', [PenggunaanModulController::class, 'useNow'])->name('use');
         Route::patch('/{pm}/status', [PenggunaanModulController::class, 'updateStatus'])->name('status');
         Route::post('/{pm}/start',  [PenggunaanModulController::class, 'start'])->name('start');
-        Route::post('/{pm}/done',   [PenggunaanModulController::class, 'done'])->name('done');
+        Route::post('/{pm}/done',  [PenggunaanModulController::class, 'done'])->name('done');
         Route::post('/{pm}/reopen', [PenggunaanModulController::class, 'reopen'])->name('reopen');
         Route::delete('/{penggunaan_modul}', [PenggunaanModulController::class, 'destroy'])->name('destroy');
         Route::get('/trash', [PenggunaanModulController::class, 'trash'])->name('trash');
@@ -200,25 +214,32 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/aktivitas/file/{file}', [AktivitasFileController::class, 'destroy'])->name('aktivitas.file.destroy');
     Route::get('/aktivitas/file/{file}/preview', [AktivitasFileController::class, 'preview'])->name('aktivitas.file.preview');
 
-    // --- Users & Logs (admin-only) ---
-    Route::middleware(['role:admin'])->group(function () {
-        Route::resource('users', UserController::class)->only(['index', 'update', 'store']);
-        Route::post('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
-
-        Route::get('/logs', [LogController::class, 'index'])->name('logs.index');
-
-        Route::prefix('admin/users')->name('admin.users.')->group(function () {
-            Route::get('/', [UserAdminController::class, 'index'])->name('index');
-            Route::get('/create', [UserAdminController::class, 'create'])->name('create');
-            Route::post('/', [UserAdminController::class, 'store'])->name('store');
-            Route::get('/{user}/edit', [UserAdminController::class, 'edit'])->name('edit');
-            Route::put('/{user}', [UserAdminController::class, 'update'])->name('update');
-            Route::delete('/{user}', [UserAdminController::class, 'destroy'])->name('destroy');
-            Route::post('/{user}/reset-password', [UserAdminController::class, 'resetPassword'])->name('reset');
-            Route::post('/{user}/send-reset-link', [UserAdminController::class, 'sendResetLink'])->name('sendResetLink');
-        });
-    });
+    // --- Tagihan File ---
+    Route::get('/billing-file/{file}/preview',  [BillingPaymentFileController::class, 'preview'])
+    ->name('billing.file.preview');
+    Route::get('/billing-file/{file}/download', [BillingPaymentFileController::class, 'download'])
+    ->name('billing.file.download');
 });
+
+// === Admin (users & logs) ===
+Route::middleware(['auth','active','role:admin'])->group(function () {
+    // Admin Users
+    Route::prefix('admin/users')->name('admin.users.')->group(function () {
+        Route::get('/', [UserAdminController::class, 'index'])->name('index');
+        Route::get('/create', [UserAdminController::class, 'create'])->name('create');
+        Route::post('/', [UserAdminController::class, 'store'])->name('store');
+        Route::get('/{user}/edit', [UserAdminController::class, 'edit'])->name('edit');
+        Route::put('/{user}', [UserAdminController::class, 'update'])->name('update');
+        Route::delete('/{user}', [UserAdminController::class, 'destroy'])->name('destroy');
+        Route::post('/{user}/toggle-status', [UserAdminController::class, 'toggleStatus'])->name('toggle-status');
+        Route::post('/{user}/reset-password', [UserAdminController::class, 'resetPassword'])->name('reset-password');
+        Route::post('/{user}/send-reset-link', [UserAdminController::class, 'sendResetLink'])->name('send-reset-link');
+    });
+
+    // Admin Logs
+    Route::get('/logs', [LogController::class, 'index'])->name('logs.index');
+});
+
 
 // Auth routes (login, register, dll.)
 require __DIR__.'/auth.php';

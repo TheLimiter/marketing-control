@@ -11,7 +11,7 @@ return new class extends Migration {
             $t->bigIncrements('id');
             $t->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
             $t->string('aktivitas', 50);            // CREATE / UPDATE / DELETE / LOGIN / LOGOUT / dll
-            $t->text('keterangan')->nullable();     // “Tambah Calon Klien #3”
+            $t->text('keterangan')->nullable();     // â€œTambah Calon Klien #3â€
             // opsional info tambahan
             $t->string('ip_address', 45)->nullable();
             $t->string('user_agent')->nullable();

@@ -136,4 +136,9 @@ class TagihanKlien extends Model
         });
         $q->when($f['q'] ?? null, fn($qq,$v)=>$qq->where('nomor','like','%'.$v.'%'));
     }
+
+    public function paymentFiles()
+{
+    return $this->hasMany(\App\Models\BillingPaymentFile::class, 'tagihan_id');
+}
 }

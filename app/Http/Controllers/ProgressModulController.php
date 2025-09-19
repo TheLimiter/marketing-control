@@ -22,7 +22,7 @@ class ProgressModulController extends Controller
         ]);
     }
 
-    /** List sekolah + ringkasan progress (untuk “Progress Modul”). */
+    /** List sekolah + ringkasan progress (untuk Progress Modul). */
     public function index(Request $r)
     {
         $search   = trim($r->get('q', ''));
@@ -77,57 +77,68 @@ class ProgressModulController extends Controller
     }
 
     /** Detail progress modul satu sekolah. */
-    public function show(MasterSekolah $master)
-    {
-        $today   = now()->startOfDay();
-        $weekAgo = $today->copy()->subDays(7);
+   public function show(MasterSekolah $master)
+{
+    $today   = now()->startOfDay();
+    $weekAgo = $today->copy()->subDays(7);
 
-        $items = PenggunaanModul::with(['modul:id,nama,urutan'])
-            ->where('master_sekolah_id', $master->id)
-            ->get()
-            ->sortBy(fn ($x) => $x->modul->urutan ?? $x->modul_id)
-            ->values();
+    $modulCols = Schema::hasColumn('modul','urutan')
+        ? ['id','nama','urutan']
+        : ['id','nama'];
 
-        $selesai   = $items->filter(fn ($x) => $x->isDone())->count();
-        $total     = $items->count();
-        $aktif     = $items->filter(fn ($x) => $x->isActive())->count();
-        $belumAda  = $total - $selesai - $aktif;
-        $percent   = $total ? (int) floor(($selesai / $total) * 100) : 0;
-        $lastUpdate= optional($items->max('updated_at'));
-        $staleDays = (int) env('PROGRESS_STALE_DAYS', 7);
-        $nextItem  = $items->first(fn ($x) => !$x->isDone());
+    $items = PenggunaanModul::with(['modul' => function ($q) use ($modulCols) {
+            $q->select($modulCols);
+        }])
+        ->where('master_sekolah_id', $master->id)
+        ->get()
+        ->sortBy(function ($x) {
+            if (Schema::hasColumn('modul','urutan') && isset($x->modul->urutan)) {
+                return $x->modul->urutan;
+            }
+            return $x->modul->nama ?? $x->modul_id;
+        })
+        ->values();
 
-        // siapkan baris untuk blade + pewarnaan per-kolom
-        $uiRows = $items->map(function ($x) use ($master, $today, $weekAgo) {
-            $done      = $x->isDone();
-            $overdue   = !$done && $x->akhir_tanggal && $x->akhir_tanggal->lt($today) && ($x->status !== 'ended');
-            $aging     = !$overdue && $x->mulai_tanggal && $x->mulai_tanggal->lte($weekAgo);
-            $cellClass = $overdue ? 'cell-danger' : ($aging ? 'cell-warning' : '');
+    $selesai    = $items->filter(fn ($x) => $x->isDone())->count();
+    $total      = $items->count();
+    $aktif      = $items->filter(fn ($x) => $x->isActive())->count();
+    $belumAda   = $total - $selesai - $aktif;
+    $percent    = $total ? (int) floor(($selesai / $total) * 100) : 0;
+    $lastUpdate = optional($items->max('updated_at'));
+    $staleDays  = (int) env('PROGRESS_STALE_DAYS', 7);
+    $nextItem   = $items->first(fn ($x) => !$x->isDone());
 
-            $ket = match (true) {
-                $x->mulai_tanggal && $x->akhir_tanggal => $x->mulai_tanggal->format('d/m/y').' — '.$x->akhir_tanggal->format('d/m/y'),
-                $x->mulai_tanggal => 'Mulai '.$x->mulai_tanggal->format('d/m/y'),
-                $x->akhir_tanggal => 'Selesai '.$x->akhir_tanggal->format('d/m/y'),
-                default => 'Tambah keterangan',
-            };
+    $uiRows = $items->map(function ($x) use ($master, $today, $weekAgo) {
+        $done      = $x->isDone();
+        $overdue   = !$done && $x->akhir_tanggal && $x->akhir_tanggal->lt($today) && ($x->status !== 'ended');
+        $aging     = !$overdue && $x->mulai_tanggal && $x->mulai_tanggal->lte($weekAgo);
+        $cellClass = $overdue ? 'cell-danger' : ($aging ? 'cell-warning' : '');
 
-            return [
-                'checked'   => $done,
-                'nama'      => $x->modul->nama ?? ('Modul #'.$x->modul_id),
-                'nis'       => $x->modul->urutan ?? $x->modul_id,
-                'ket'       => $ket,
-                'cellClass' => $cellClass,
-                'toggle'    => route('progress.toggle', [$master->id, $x->id]),
-            ];
-        })->all();
+        $ket = match (true) {
+            $x->mulai_tanggal && $x->akhir_tanggal => $x->mulai_tanggal->format('d/m/y').' - '.$x->akhir_tanggal->format('d/m/y'),
+            $x->mulai_tanggal => 'Mulai '.$x->mulai_tanggal->format('d/m/y'),
+            $x->akhir_tanggal => 'Selesai '.$x->akhir_tanggal->format('d/m/y'),
+            default => 'Tambah keterangan',
+        };
 
-        return view('progress_modul.show', compact(
-            'master','items','total','selesai','aktif','belumAda',
-            'percent','lastUpdate','nextItem','uiRows','staleDays'
-        ));
-    }
+        return [
+            'checked'   => $done,
+            'nama'      => $x->modul->nama ?? ('Modul #'.$x->modul_id),
+            'nis'       => ($x->modul->urutan ?? null) ?? $x->modul_id, // tetap aman
+            'ket'       => $ket,
+            'cellClass' => $cellClass,
+            'toggle'    => route('progress.toggle', [$master->id, $x->id]),
+        ];
+    })->all();
 
-    /** Matriks 1–9 (tanpa perubahan besar). */
+    return view('progress_modul.show', compact(
+        'master','items','total','selesai','aktif','belumAda',
+        'percent','lastUpdate','nextItem','uiRows','staleDays'
+    ));
+}
+
+
+    /** Matriks 1-9 (tanpa perubahan besar). */
     public function matrix(Request $r)
     {
         $search = trim($r->get('q', ''));
@@ -228,13 +239,13 @@ class ProgressModulController extends Controller
         ])->save();
 
         $label = $pm->modul->nama ?? ('Modul #'.$pm->modul_id);
-        $note  = trim(($pm->mulai_tanggal?->format('d/m/Y') ?? '—').' → '.($pm->akhir_tanggal?->format('d/m/Y') ?? '—'));
+        $note  = trim(($pm->mulai_tanggal?->format('d/m/Y') ?? '-').''.($pm->akhir_tanggal?->format('d/m/Y') ?? '-'));
         $this->logAktivitas($master, 'Ubah tanggal '.$label, $note);
 
         return back()->with('ok','Tanggal diperbarui.');
     }
 
-    /** Pastikan baris 1–9 ada semua. */
+    /** Pastikan baris 1-9 ada semua. */
     public function ensure(MasterSekolah $master)
     {
         $mods = Modul::query()
@@ -264,7 +275,7 @@ class ProgressModulController extends Controller
 
         if ($created > 0) $this->logAktivitas($master, "Lengkapi baris modul (buat $created)");
 
-        return back()->with('ok', $created ? "Ditambah $created baris modul." : 'Semua baris 1–9 sudah lengkap.');
+        return back()->with('ok', $created ? "Ditambah $created baris modul." : 'Semua baris 1-9 sudah lengkap.');
     }
 
     /** Export CSV matriks. */

@@ -16,6 +16,8 @@
     @vite(['resources/css/app.css','resources/js/app.js'])
     @stack('styles')
 </head>
+
+@include('partials.file-preview')
 <body data-bs-theme="light">
 @php
     use App\Models\MasterSekolah as MS;
@@ -123,8 +125,8 @@
                 <a class="nav-link {{ $is('progress.index') ? 'active' : '' }}" href="{{ route('progress.index') }}" title="Progress Modul">
                     <i class="bi bi-graph-up-arrow"></i> <span>Progress Modul</span>
                 </a>
-                <a class="nav-link {{ $is('progress.matrix') ? 'active' : '' }}" href="{{ route('progress.matrix') }}" title="Progress Modul (1–9)">
-                    <i class="bi bi-grid-1x2"></i> <span>Progress Modul (1–9)</span>
+                <a class="nav-link {{ $is('progress.matrix') ? 'active' : '' }}" href="{{ route('progress.matrix') }}" title="Progress Modul (1-9)">
+                    <i class="bi bi-grid-1x2"></i> <span>Progress Modul (1-9)</span>
                 </a>
 
                 <div class="mc-sep my-2"></div>
@@ -138,9 +140,11 @@
                 @endif
 
                 {{-- Tagihan & User --}}
-                <a class="nav-link {{ $is('tagihan.*') ? 'active' : '' }}" href="{{ route('tagihan.laporan') }}" title="Tagihan">
-                    <i class="bi bi-receipt"></i> <span>Tagihan</span>
+                <a class="nav-link {{ $is('tagihan.*') ? 'active' : '' }}"
+                href="{{ route('tagihan.index') }}" title="Tagihan">
+                <i class="bi bi-receipt"></i> <span>Tagihan</span>
                 </a>
+
                 @role('admin')
                   <li class="nav-item">
                     <a class="nav-link {{ $is('admin.users.*') ? 'active' : '' }}" href="{{ route('admin.users.index') }}" title="Pengguna">

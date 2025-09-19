@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-
 use App\Models\Mou;
+use App\Models\AktivitasProspek;
 use App\Models\Concerns\LogsActivity;
 use App\Models\Concerns\TracksUser;
 use Illuminate\Database\Eloquent\Model;
@@ -23,21 +23,40 @@ class MasterSekolah extends Model
         'stage','stage_changed_at','created_by','updated_by',
     ];
 
-    public const ST_CALON=1, ST_PROSPEK=2, ST_NEGOSIASI=3, ST_MOU=4, ST_KLIEN=5;
+    public const ST_CALON = 1;
+    public const ST_PROSPEK = 2;
+    public const ST_NEGOSIASI = 3;
+    public const ST_MOU = 4;
+    public const ST_KLIEN = 5;
 
     protected $casts = [
-        'stage' => 'integer',
+        'stage'            => 'integer',
         'stage_changed_at' => 'datetime',
-        'ttd_status' => 'boolean',
+        'ttd_status'       => 'boolean',
     ];
 
-    // Accessors
-    public function getMouOkAttribute(): bool { return (bool) ($this->mou_path ?? false); }
-    public function getTtdOkAttribute(): bool { return (bool) ($this->ttd_status ?? false); }
-    public function getNamaDisplayAttribute(): ?string { return $this->nama_sekolah ?? $this->nama ?? null; }
-    public function getNamaAttribute() { return $this->nama_sekolah ?? null; }
+    // -------- Accessors --------
+    public function getMouOkAttribute(): bool
+    {
+        return (bool) ($this->mou_path ?? false);
+    }
 
-    // Accesor untuk persen modul
+    public function getTtdOkAttribute(): bool
+    {
+        return (bool) ($this->ttd_status ?? false);
+    }
+
+    public function getNamaDisplayAttribute(): ?string
+    {
+        return $this->nama_sekolah ?? $this->nama ?? null;
+    }
+
+    public function getNamaAttribute()
+    {
+        return $this->nama_sekolah ?? null;
+    }
+
+    // Persentase progres modul (0-100)
     public function getModulPercentAttribute(): int
     {
         $total = (int) ($this->total_modul ?? 0);
@@ -45,33 +64,61 @@ class MasterSekolah extends Model
         return $total > 0 ? (int) round(100 * $done / $total) : 0;
     }
 
-    public static function stageLabel(int $s): string
+    // Label stage: terima null agar tidak TypeError
+    public static function stageLabel(?int $s): string
     {
-        return match($s){
-            self::ST_CALON=>'Calon', self::ST_PROSPEK=>'Prospek',
-            self::ST_NEGOSIASI=>'Negosiasi', self::ST_MOU=>'MOU',
-            self::ST_KLIEN=>'Klien', default=>(string)$s,
+        $s ??= self::ST_CALON;
+
+        return match ($s) {
+            self::ST_CALON      => 'Calon',
+            self::ST_PROSPEK    => 'Prospek',
+            self::ST_NEGOSIASI  => 'Negosiasi',
+            self::ST_MOU        => 'MOU',
+            self::ST_KLIEN      => 'Klien',
+            default             => (string) $s,
         };
     }
 
-    // Scopes
-    public function scopeCalon(Builder $q): Builder { return $q->where('status_klien','calon'); }
-    public function scopeProspek(Builder $q): Builder { return $q->where('status_klien','prospek'); }
-    public function scopeKlien(Builder $q): Builder { return $q->where('status_klien','klien'); }
-    public function scopeStage($q,int $s){ return $q->where('stage',$s); }
-    public function scopeHasMou($q,bool $yes=true){ return $yes? $q->whereNotNull('mou_path') : $q->whereNull('mou_path'); }
-    public function scopeHasTtd($q,bool $yes=true){
-        return $yes ? $q->where('ttd_status',1)
-                     : $q->where(fn($x)=>$x->whereNull('ttd_status')->orWhere('ttd_status',0));
+    // -------- Scopes --------
+    public function scopeCalon(Builder $q): Builder
+    {
+        return $q->where('status_klien', 'calon');
     }
 
-    // Stage
+    public function scopeProspek(Builder $q): Builder
+    {
+        return $q->where('status_klien', 'prospek');
+    }
+
+    public function scopeKlien(Builder $q): Builder
+    {
+        return $q->where('status_klien', 'klien');
+    }
+
+    public function scopeStage(Builder $q, ?int $s): Builder
+    {
+        if ($s === null) return $q;
+        return $q->where('stage', $s);
+    }
+
+    public function scopeHasMou(Builder $q, bool $yes = true): Builder
+    {
+        return $yes ? $q->whereNotNull('mou_path') : $q->whereNull('mou_path');
+    }
+
+    public function scopeHasTtd(Builder $q, bool $yes = true): Builder
+    {
+        return $yes
+            ? $q->where('ttd_status', 1)
+            : $q->where(fn ($x) => $x->whereNull('ttd_status')->orWhere('ttd_status', 0));
+    }
+
+    // -------- Stage Ops --------
     public function moveToStage(int $to, ?string $note = null): void
     {
-        // ambil stage sebelum berubah
         $from = (int) ($this->getOriginal('stage') ?? self::ST_CALON);
 
-        // === ubah: pakai config untuk enforce MOU sebelum Klien
+        // Enforce MOU sebelum Klien jika diaktifkan
         $require = (bool) config('biz.require_mou_ttd', false);
         if ($require && $to === self::ST_KLIEN && (int) ($this->stage ?? 0) < self::ST_MOU) {
             throw new \DomainException('Set MOU terlebih dahulu sebelum jadi Klien.');
@@ -79,39 +126,63 @@ class MasterSekolah extends Model
 
         $this->forceFill([
             'stage'             => $to,
-            'stage_changed_at' => now(),
+            'stage_changed_at'  => now(),
         ])->save();
 
-        // catat aktivitas (pakai konkatenasi agar aman)
+        // Catat aktivitas
         $this->aktivitas()->create([
-            'tanggal'      => now(),
+            'tanggal'    => now(),
             'jenis'      => 'stage_change',
             'hasil'      => $from . '→' . $to,
-            'catatan'      => $note,
+            'catatan'    => $note,
             'created_by' => auth()->id(),
         ]);
+    }
+
+    protected static function booted(): void
+    {
+        // Default-kan stage saat create jika belum diisi
+        static::creating(function (self $m) {
+            if ($m->stage === null) {
+                $m->stage = self::ST_CALON;
+            }
+        });
     }
 
     protected function getEntityType(): string
     {
         return match ($this->stage) {
-            self::ST_CALON=>'calon', self::ST_PROSPEK=>'prospek',
-            self::ST_NEGOSIASI=>'negosiasi', self::ST_MOU=>'mou',
-            self::ST_KLIEN=>'klien', default=>'sekolah',
+            self::ST_CALON     => 'calon',
+            self::ST_PROSPEK   => 'prospek',
+            self::ST_NEGOSIASI => 'negosiasi',
+            self::ST_MOU       => 'mou',
+            self::ST_KLIEN     => 'klien',
+            default            => 'sekolah',
         };
     }
 
-    // Relasi
-    public function mouRows(){ return $this->hasMany(Mou::class,'master_sekolah_id'); }
-    public function aktivitas(){ return $this->hasMany(AktivitasProspek::class,'master_sekolah_id'); }
-    public function penggunaanModul(){ return $this->hasMany(\App\Models\PenggunaanModul::class, 'master_sekolah_id');}
+    // -------- Relasi --------
+    public function mouRows()
+    {
+        return $this->hasMany(Mou::class, 'master_sekolah_id');
+    }
 
-    public function modulUsages() // assignment modul ke sekolah
+    public function aktivitas()
+    {
+        return $this->hasMany(AktivitasProspek::class, 'master_sekolah_id');
+    }
+
+    public function penggunaanModul()
     {
         return $this->hasMany(\App\Models\PenggunaanModul::class, 'master_sekolah_id');
     }
 
-    public function progressItems() // progress modul per sekolah
+    public function modulUsages()
+    {
+        return $this->hasMany(\App\Models\PenggunaanModul::class, 'master_sekolah_id');
+    }
+
+    public function progressItems()
     {
         return $this->hasMany(\App\Models\ProgressModul::class, 'master_sekolah_id');
     }

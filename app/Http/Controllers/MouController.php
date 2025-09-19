@@ -27,7 +27,7 @@ class MouController extends Controller
 
         $changes = [];
 
-        // Upload file (opsional ganti file lama)
+        // Upload file
         if ($request->hasFile('mou')) {
             $newPath = $request->file('mou')->store('mou', 'public');
 
@@ -65,7 +65,7 @@ class MouController extends Controller
             ]);
         }
 
-        // === Redirect sesuai pilihan user ===
+        // Redirect
         if ($request->input('next_action') === 'billing') {
             // arahkan ke form Buat Tagihan sambil membawa master_sekolah_id
             return redirect()
@@ -73,7 +73,7 @@ class MouController extends Controller
                 ->with('ok', 'MOU/TTD tersimpan. Silakan atur tagihan.');
         }
 
-        // default: kembali (atau ke index)
+        // default: kembali
         return redirect()
             ->route('master.index')
             ->with('ok', 'MOU/TTD tersimpan.');

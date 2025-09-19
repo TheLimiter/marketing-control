@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<h4 class="mb-3">MOU Calon Klien: {{ $calon->nama ?? '—' }} (#{{ $calon->id }})</h4>
+<h4 class="mb-3">MOU Calon Klien: {{ $calon->nama ?? '' }} (#{{ $calon->id }})</h4>
 
 <form action="{{ route('calon.mou.update', $calon) }}" method="post" enctype="multipart/form-data">
   @csrf

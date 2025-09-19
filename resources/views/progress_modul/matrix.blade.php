@@ -12,7 +12,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <div class="h-page">Progress Modul</div>
-            <div class="subtle">Matriks checklist 1–9 per sekolah</div>
+            <div class="subtle">Matriks checklist 1-9 per sekolah</div>
         </div>
         <a href="{{ route('progress.export') }}" class="btn btn-ghost round">
             <i class="bi bi-download me-1"></i> Export CSV
@@ -24,7 +24,7 @@
         <div class="toolbar">
             <div class="field flex-grow-1" style="min-width:260px">
                 <label>Cari Sekolah</label>
-                <input type="text" name="q" value="{{ $search }}" class="input-soft" placeholder="Ketik nama sekolah…">
+                <input type="text" name="q" value="{{ $search }}" class="input-soft" placeholder="Ketik nama sekolah">
             </div>
 
             <div class="field" style="min-width:200px">
@@ -67,7 +67,7 @@
             <div class="h-section">
                 <i class="bi bi-grid-3x3-gap"></i><span>Matriks Progress</span>
             </div>
-            <div class="text-muted small">Checklist 1–9 per sekolah</div>
+            <div class="text-muted small">Checklist 1-9 per sekolah</div>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">

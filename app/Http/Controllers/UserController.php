@@ -48,7 +48,7 @@ class UserController extends Controller
 
     public function toggleStatus(Request $request, User $user)
     {
-        if ($user->hasRole('Admin')) {
+        if ($user->hasRole('admin')) {
             throw ValidationException::withMessages(['error' => 'Tidak bisa menonaktifkan pengguna dengan peran Admin.']);
         }
 

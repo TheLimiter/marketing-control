@@ -5,10 +5,10 @@
       <div class="eyebrow mb-1">Detail Sekolah</div>
       <h5 class="offcanvas-title h-page mb-0" id="schoolDetailLabel" data-f="nama">-</h5>
       <div class="subtle mt-1">
-        <span class="chip" data-f="jenjang">—</span>
-        <span class="chip stage-chip" data-f="stage">—</span>
-        <span class="chip" data-f="mou">—</span>
-        <span class="chip" data-f="ttd">—</span>
+        <span class="chip" data-f="jenjang"></span>
+        <span class="chip stage-chip" data-f="stage"></span>
+        <span class="chip" data-f="mou"></span>
+        <span class="chip" data-f="ttd"></span>
       </div>
     </div>
     <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
@@ -21,7 +21,7 @@
         <i class="bi bi-geo-alt text-muted mt-1"></i>
         <div class="flex-grow-1">
           <div class="h-section mb-1">Alamat</div>
-          <div class="small" data-f="alamat">—</div>
+          <div class="small" data-f="alamat"></div>
         </div>
         <button class="btn btn-sm btn-ghost round copy-btn" data-copy="alamat" title="Salin alamat">
           <i class="bi bi-clipboard"></i>
@@ -37,7 +37,7 @@
             <i class="bi bi-person-lines-fill text-muted mt-1"></i>
             <div>
               <div class="h-section mb-1">Narahubung</div>
-              <div class="small" data-f="narahubung">—</div>
+              <div class="small" data-f="narahubung"></div>
             </div>
           </div>
         </div>
@@ -46,7 +46,7 @@
             <i class="bi bi-telephone text-muted mt-1"></i>
             <div>
               <div class="h-section mb-1">No. HP</div>
-              <div class="small" data-f="nohp">—</div>
+              <div class="small" data-f="nohp"></div>
               <div class="d-flex gap-2 mt-1">
                 <a class="btn btn-sm btn-outline-secondary round action-call" target="_blank">
                   <i class="bi bi-telephone-outbound me-1"></i> Telepon
@@ -69,19 +69,19 @@
       <div class="row small g-3">
         <div class="col-6">
           <div class="text-muted">Jumlah Siswa</div>
-          <div class="fw-semibold" data-f="siswa">—</div>
+          <div class="fw-semibold" data-f="siswa"></div>
         </div>
         <div class="col-6">
           <div class="text-muted">Sumber</div>
-          <div class="fw-semibold" data-f="sumber">—</div>
+          <div class="fw-semibold" data-f="sumber"></div>
         </div>
         <div class="col-12">
           <div class="text-muted">Tindak Lanjut</div>
-          <div class="fw-semibold" data-f="tindak">—</div>
+          <div class="fw-semibold" data-f="tindak"></div>
         </div>
         <div class="col-12">
           <div class="text-muted">Catatan</div>
-          <div class="fw-semibold" data-f="catatan">—</div>
+          <div class="fw-semibold" data-f="catatan"></div>
         </div>
       </div>
     </div>
@@ -89,7 +89,7 @@
     {{-- Meta & Quick Actions --}}
     <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
       <div class="text-muted small">
-        Dibuat: <span data-f="created">—</span> • Update: <span data-f="updated">—</span>
+        Dibuat: <span data-f="created"></span>Update: <span data-f="updated"></span>
       </div>
       <div class="d-flex flex-wrap gap-2">
         <a href="#" class="btn btn-sm btn-ghost round quick-aktivitas">
@@ -127,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const setText = (key, v) => {
     const el = off.querySelector(`[data-f="${key}"]`);
-    if (el) el.textContent = (v && v !== '') ? v : '—';
+    if (el) el.textContent = (v && v !== '') ? v : '-';
   };
 
   const buildTel = (raw='') => {
@@ -170,7 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (stageEl) {
       stageEl.className = 'chip stage-chip';
       stageEl.className = stageClass(b.dataset.stage);
-      stageEl.textContent = b.dataset.stage || '—';
+      stageEl.textContent = b.dataset.stage || '';
     }
 
     const aEdit   = off.querySelector('.quick-edit');

@@ -6,11 +6,14 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void {
         Schema::table('master_sekolah', function (Blueprint $table) {
+            // stage: simpan sebagai smallint (PG tidak punya unsigned tinyint)
             if (! Schema::hasColumn('master_sekolah', 'stage')) {
-                $table->unsignedTinyInteger('stage')->default(1)->after('id'); // 1=calon
+                $table->smallInteger('stage')->default(1); // 1=calon
             }
+
+            // timestamp perubahan stage
             if (! Schema::hasColumn('master_sekolah', 'stage_changed_at')) {
-                $table->timestamp('stage_changed_at')->nullable()->after('stage');
+                $table->timestamp('stage_changed_at')->nullable();
             }
         });
     }

@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
+        if (!Schema::hasTable('penggunaan_modul')) return;
+
         Schema::table('penggunaan_modul', function (Blueprint $t) {
             if (!Schema::hasColumn('penggunaan_modul', 'status')) {
                 $t->string('status', 20)->default('attached')->index();
@@ -24,15 +26,16 @@ return new class extends Migration {
                 $t->text('notes')->nullable();
             }
             if (!Schema::hasColumn('penggunaan_modul', 'deleted_at')) {
-                $t->softDeletes(); // SoftDeletes
+                $t->softDeletes(); // jika deleted_at sudah ditambah di migrasi lain, bagian ini bisa di-skip
             }
         });
     }
 
     public function down(): void
     {
+        if (!Schema::hasTable('penggunaan_modul')) return;
+
         Schema::table('penggunaan_modul', function (Blueprint $t) {
-            // turunkan hanya yang kita tambah
             foreach (['status','started_at','finished_at','reopened_at','notes','deleted_at'] as $c) {
                 if (Schema::hasColumn('penggunaan_modul', $c)) {
                     $t->dropColumn($c);

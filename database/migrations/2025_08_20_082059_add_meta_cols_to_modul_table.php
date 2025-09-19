@@ -8,13 +8,13 @@ return new class extends Migration {
     public function up(): void {
         Schema::table('modul', function (Blueprint $t) {
             if (!Schema::hasColumn('modul','kategori')) {
-                $t->string('kategori', 50)->nullable()->after('nama');
+                $t->string('kategori', 50)->nullable();
             }
             if (!Schema::hasColumn('modul','versi')) {
-                $t->string('versi', 50)->nullable()->after('kategori');
+                $t->string('versi', 50)->nullable();
             }
             if (!Schema::hasColumn('modul','deskripsi')) {
-                $t->text('deskripsi')->nullable()->after('versi');
+                $t->text('deskripsi')->nullable();
             }
         });
     }

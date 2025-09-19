@@ -42,7 +42,7 @@
           @if($isAdmin)
             <form action="{{ route('progress.ensure', $sid) }}" method="post" class="d-inline ms-2">
               @csrf
-              <button type="submit" class="btn btn-sm btn-outline-primary" title="Lengkapi baris modul 1–9">Lengkapi 1–9</button>
+              <button type="submit" class="btn btn-sm btn-outline-primary" title="Lengkapi baris modul 1-9">Lengkapi 1-9</button>
             </form>
           @endif
         </td>

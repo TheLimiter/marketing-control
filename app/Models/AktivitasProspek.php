@@ -18,57 +18,57 @@ class AktivitasProspek extends Model
 
     protected $casts = ['tanggal' => 'datetime'];
 
-    public function master()
-    {
-        return $this->belongsTo(MasterSekolah::class, 'master_sekolah_id');
-    }
+    protected $appends = ['badge_class', 'display_jenis', 'display_hasil'];
 
-    // ⬇️ tambahkan ini
-    public function creator()
-    {
-        return $this->belongsTo(\App\Models\User::class, 'created_by');
-    }
-
-    public function files()
-    {
-        return $this->hasMany(AktivitasFile::class, 'aktivitas_id');
-    }
+    public function master()  { return $this->belongsTo(MasterSekolah::class, 'master_sekolah_id'); }
+    public function creator() { return $this->belongsTo(User::class, 'created_by'); }
+    public function files()   { return $this->hasMany(AktivitasFile::class, 'aktivitas_id'); }
 
     public function getCreatorNameAttribute(): string
     {
-        return $this->creator?->name ?? '—';
+        return $this->creator?->name ?? '';
     }
 
+    // LABEL JENIS
     public function getJenisLabelAttribute(): string
     {
         $map = [
-            'stage_change'      => 'Perubahan Tahap',
-            'module_assign'     => 'Penugasan Modul',
-            'module_status'     => 'Status Modul',
-            'module_use'        => 'Catat Penggunaan',
-            'mou_upload'        => 'Unggah MOU',
-            'ttd_mark'          => 'TTD Ditandai',
-            'prospek.to_klien'  => 'Konversi ke Klien',
+            'stage_change'     => 'Perubahan Tahap',
+            'modul_attach'     => 'Lampiran Modul',
+            'modul_progress'   => 'Progres Modul',
+            'modul_done'       => 'Modul Selesai',
+            'modul_reopen'     => 'Modul Dibuka Ulang',
+            'mou_update'       => 'MOU / TTD',
+            'kunjungan'        => 'Kunjungan',
+            'meeting'          => 'Meeting',
+            'follow_up'        => 'Follow Up',
+            'whatsapp'         => 'WhatsApp',
+            'email'            => 'Email',
+            'lainnya'          => 'Lainnya',
+            // kalau masih ada event lama:
+            'prospek.to_klien' => 'Konversi ke Klien',
         ];
-        if (isset($map[$this->jenis])) return $map[$thisu->jenis];
-        return Str::headline(str_replace('.', ' ', (string)$this->jenis));
+
+        if (isset($map[$this->jenis])) {
+            return $map[$this->jenis]; // <- perbaikan dari $thisu
+        }
+
+        return Str::headline(str_replace('.', ' ', (string) $this->jenis));
     }
 
+    // HASIL
     public function getHasilLabelAttribute(): ?string
     {
         $hasil = $this->hasil;
 
-        // Perubahan tahap: dukung "5->1" / "5→1" / "5 to 1"
         if ($this->jenis === 'stage_change' && $hasil) {
-            if (preg_match('/(\d+)\s*(?:→|->|to)\s*(\d+)/i', $hasil, $m)) {
+            if (preg_match('/(\d+)\s*(?:|->|to)\s*(\d+)/i', $hasil, $m)) {
                 $from = (int) $m[1];
                 $to   = (int) $m[2];
-                return MasterSekolah::stageLabel($from) . ' → ' . MasterSekolah::stageLabel($to);
+                return MasterSekolah::stageLabel($from) . '' . MasterSekolah::stageLabel($to);
             }
         }
 
-
-        // Status modul: "official / paused" → "Official / Paused"
         if ($this->jenis === 'module_status' && $hasil) {
             [$lisensi, $status] = array_map('trim', explode('/', $hasil) + [null, null]);
             $lisensiLbl = (strtolower($lisensi) === 'official') ? 'Official' : 'Trial';
@@ -77,5 +77,47 @@ class AktivitasProspek extends Model
         }
 
         return $hasil;
+    }
+
+    // --- KELAS BADGE untuk feed/dashboard ---
+    public function getBadgeClassAttribute(): string
+    {
+        $k = strtolower($this->jenis ?? 'lainnya');
+
+        $map = [
+            'modul_progress' => 'bg-info text-white',
+            'modul_done'     => 'bg-success text-white',
+            'modul_reopen'   => 'bg-warning text-dark',
+            'modul_attach'   => 'bg-secondary text-white',
+            'stage_change'   => 'bg-dark text-white',
+            'kunjungan'      => 'bg-primary text-white',
+            'meeting'        => 'bg-secondary text-white',
+            'follow_up'      => 'bg-secondary text-white',
+            'whatsapp'       => 'bg-success text-white',
+            'email'          => 'bg-secondary text-white',
+            'lainnya'        => 'bg-light text-dark',
+        ];
+
+        return 'rounded-pill '.($map[$k] ?? 'bg-secondary text-white');
+    }
+
+    // --- alias yang dipakai di Blade ---
+    public function getDisplayJenisAttribute(): string
+    {
+        // khusus stage_change: tampilkan arah kalau bisa dibaca dari hasil
+        if ($this->jenis === 'stage_change' && ($h = $this->getHasilLabelAttribute())) {
+            return $h; // Prospek Negosiasi, dsb.
+        }
+        return $this->getJenisLabelAttribute();
+    }
+
+    public function getDisplayHasilAttribute(): ?string
+    {
+        return $this->getHasilLabelAttribute();
+    }
+
+    public function paymentFiles()
+    {
+        return $this->hasMany(\App\Models\BillingPaymentFile::class, 'aktivitas_id');
     }
 }

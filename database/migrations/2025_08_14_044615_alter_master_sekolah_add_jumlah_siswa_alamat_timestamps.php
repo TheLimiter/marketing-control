@@ -9,19 +9,22 @@ return new class extends Migration {
     public function up(): void {
         Schema::table('master_sekolah', function (Blueprint $t) {
             // alamat (kalau belum ada)
-            if (!Schema::hasColumn('master_sekolah', 'alamat')) {
-                $t->text('alamat')->nullable()->after('nama_sekolah');
+            if (! Schema::hasColumn('master_sekolah', 'alamat')) {
+                $t->text('alamat')->nullable();
             }
 
-            // jumlah_siswa
-            if (!Schema::hasColumn('master_sekolah', 'jumlah_siswa')) {
-                $t->unsignedInteger('jumlah_siswa')->nullable()->after('narahubung');
+            // jumlah_siswa (integer biasa; PostgreSQL tidak punya unsigned)
+            if (! Schema::hasColumn('master_sekolah', 'jumlah_siswa')) {
+                $t->integer('jumlah_siswa')->nullable();
+                // Jika ingin benar-benar non-negatif di PG saja, bisa tambahkan CHECK di migrasi terpisah.
             }
 
-            // timestamps (dibuat pada / dirubah pada)
-            // kalau sebelumnya belum ada created_at & updated_at
-            if (!Schema::hasColumn('master_sekolah', 'created_at') && !Schema::hasColumn('master_sekolah', 'updated_at')) {
-                $t->timestamps(); // created_at, updated_at
+            // timestamps: tambahkan per kolom agar tidak “miss” salah satu
+            if (! Schema::hasColumn('master_sekolah', 'created_at')) {
+                $t->timestamp('created_at')->nullable();
+            }
+            if (! Schema::hasColumn('master_sekolah', 'updated_at')) {
+                $t->timestamp('updated_at')->nullable();
             }
         });
     }
@@ -31,10 +34,7 @@ return new class extends Migration {
             if (Schema::hasColumn('master_sekolah', 'jumlah_siswa')) {
                 $t->dropColumn('jumlah_siswa');
             }
-            // alamat & timestamps biasanya tidak kita drop saat rollback skema tambah-kolom.
-            // Tapi kalau kamu pengen strict, bisa tambahkan drop di sini.
+            // alamat & timestamps sengaja tidak di-drop agar tidak mengganggu data yang sudah ada.
         });
     }
 };
-
-

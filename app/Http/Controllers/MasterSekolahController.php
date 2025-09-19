@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\MasterSekolah;
-use App\Models\PenggunaanModul;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -13,18 +12,21 @@ class MasterSekolahController extends Controller
     {
         $q = MasterSekolah::query();
 
-        // total modul yang di-assign -> penyebut
+        // status yang dianggap selesai
+        $doneStates = ['done','selesai','complete','completed','ended'];
+
+        // total modul & modul selesai
         $q->withCount([
             'penggunaanModul as total_modul',
-            'penggunaanModul as modul_done' => function ($qq) {
-                $qq->where(function ($w) {
-                    $w->whereIn(DB::raw('LOWER(status)'), ['selesai','done','complete','completed','ended'])
-                      ->orWhereNotNull('akhir_tanggal');
+            'penggunaanModul as modul_done' => function ($qq) use ($doneStates) {
+                $qq->where(function ($w) use ($doneStates) {
+                    $w->whereIn(DB::raw("LOWER(COALESCE(penggunaan_modul.status, ''))"), $doneStates)
+                      ->orWhereNotNull('penggunaan_modul.finished_at');
                 });
             },
         ]);
 
-        // Alias: status=calon|prospek|klien -> filter stage
+        // Alias: status => stage
         if ($request->filled('status')) {
             $map = [
                 'calon'   => MasterSekolah::ST_CALON,
@@ -36,48 +38,45 @@ class MasterSekolahController extends Controller
             }
         }
 
-        // Filter stage langsung (opsional)
+        // Filter stage langsung
         if ($request->filled('stage')) {
             $q->where('stage', (int) $request->integer('stage'));
         }
 
-        // Filter MOU: yes|no (butuh scope di model)
+        // Filter MOU & TTD (biarkan seperti sebelumnya jika memang ada scope hasMou/hasTtd)
         if ($request->filled('mou')) {
-            if ($request->mou === 'yes') $q->hasMou(true);
-            if ($request->mou === 'no')  $q->hasMou(false);
+            $q->{$request->mou === 'yes' ? 'hasMou' : 'hasMou'}($request->mou === 'yes');
         }
-
-        // Filter TTD: yes|no (butuh scope di model)
         if ($request->filled('ttd')) {
-            if ($request->ttd === 'yes') $q->hasTtd(true);
-            if ($request->ttd === 'no')  $q->hasTtd(false);
+            $q->{$request->ttd === 'yes' ? 'hasTtd' : 'hasTtd'}($request->ttd === 'yes');
         }
 
-        // Pencarian teks sederhana
+        // Pencarian teks
         if ($request->filled('q')) {
-            $s = trim($request->q);
-            $q->where(function ($w) use ($s) {
-                $w->where('nama_sekolah', 'like', "%{$s}%")
-                  ->orWhere('alamat', 'like', "%{$s}%")
-                  ->orWhere('narahubung', 'like', "%{$s}%")
-                  ->orWhere('no_hp', 'like', "%{$s}%");
+            $s   = trim($request->q);
+            $op  = DB::getDriverName() === 'pgsql' ? 'ilike' : 'like';
+            $pat = "%{$s}%";
+            $q->where(function ($w) use ($op, $pat) {
+                $w->where('nama_sekolah', $op, $pat)
+                  ->orWhere('alamat',      $op, $pat)
+                  ->orWhere('narahubung',  $op, $pat)
+                  ->orWhere('no_hp',       $op, $pat);
             });
         }
 
         $rows = $q->withCount('aktivitas')
-                    ->latest()
-                    ->paginate(15)
-                    ->withQueryString();
+                  ->latest()
+                  ->paginate((int) $request->input('per_page', 15))
+                  ->withQueryString();
 
         $stageOptions = [
-            MasterSekolah::ST_CALON     => 'Calon',
-            MasterSekolah::ST_PROSPEK   => 'Prospek',
-            MasterSekolah::ST_NEGOSIASI => 'Negosiasi',
-            MasterSekolah::ST_MOU       => 'MOU',
-            MasterSekolah::ST_KLIEN     => 'Klien',
+            MasterSekolah::ST_CALON      => 'Calon',
+            MasterSekolah::ST_PROSPEK    => 'Prospek',
+            MasterSekolah::ST_NEGOSIASI  => 'Negosiasi',
+            MasterSekolah::ST_MOU        => 'MOU',
+            MasterSekolah::ST_KLIEN      => 'Klien',
         ];
 
-        // (opsional) paketkan current filters
         $filters = [
             'q'      => $request->q,
             'status' => $request->status,
@@ -109,7 +108,6 @@ class MasterSekolahController extends Controller
             'jumlah_siswa'   => 'nullable|integer|min:0',
         ]);
 
-        // Default & mapping stage
         $payload['status_klien'] = $payload['status_klien'] ?? 'calon';
         $stageMap = [
             'calon'   => MasterSekolah::ST_CALON,
@@ -120,9 +118,7 @@ class MasterSekolahController extends Controller
 
         $row = MasterSekolah::create($payload);
 
-        return redirect()
-            ->route('master.index')
-            ->with('ok', "Sekolah #{$row->id} berhasil ditambahkan.");
+        return redirect()->route('master.index')->with('ok', "Sekolah #{$row->id} berhasil ditambahkan.");
     }
 
     public function edit(MasterSekolah $master)
@@ -150,43 +146,13 @@ class MasterSekolahController extends Controller
     }
 
     /**
-     * Menampilkan detail lengkap suatu sekolah.
+     * Opsi B: semua akses /master-sekolah/{id} diarahkan ke halaman aktivitas per-sekolah.
      */
-    public function show(\App\Models\MasterSekolah $master)
+    public function show(MasterSekolah $master)
     {
-        // Ambil penggunaan modul + modulnya, urutkan by urutan (fallback id)
-        $items = $master->penggunaanModul()
-            ->with(['modul:id,nama,urutan'])
-            ->get()
-            ->sortBy(fn($x) => $x->modul->urutan ?? $x->modul_id)
-            ->values();
-
-        $doneStatuses = ['selesai','done','complete','completed','ended'];
-
-        $total   = $items->count();
-        $selesai = $items->filter(function($x) use ($doneStatuses){
-            $s = strtolower($x->status ?? '');
-            return in_array($s, $doneStatuses, true) || !empty($x->akhir_tanggal);
-        })->count();
-        $aktif   = $items->filter(fn($x)=> strtolower($x->status ?? '')==='aktif' && empty($x->akhir_tanggal))->count();
-
-        $percent = $total ? (int) floor(($selesai/$total)*100) : 0;
-        $lastUpdate = optional($items->max('updated_at'));
-
-        $nextItem = $items->first(function($x) use ($doneStatuses){
-            $s = strtolower($x->status ?? '');
-            return !(in_array($s,$doneStatuses,true) || !empty($x->akhir_tanggal));
-        });
-
-        // Aktivitas terbaru (kalau ada)
-        $aktivitas = $master->aktivitas()->latest('tanggal')->latest()->take(10)->get();
-
-        return view('master.show', compact(
-            'master','items','total','selesai','aktif','percent','lastUpdate','nextItem','aktivitas'
-        ));
+        return redirect()->route('master.aktivitas.index', $master->id);
     }
 
-    // === Stage ===
     public function updateStage(Request $request, MasterSekolah $master)
     {
         $validated = $request->validate([

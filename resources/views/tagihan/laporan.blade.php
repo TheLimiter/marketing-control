@@ -22,7 +22,7 @@
     <div class="field" style="min-width:220px">
       <label>Klien</label>
       <select name="master_sekolah_id" class="select-soft">
-        <option value="">— semua —</option>
+        <option value="">semua</option>
         @foreach($klien as $k)
           <option value="{{ $k->id }}" {{ (string)request('master_sekolah_id')===(string)$k->id?'selected':'' }}>
             {{ $k->nama_sekolah }}
@@ -34,7 +34,7 @@
     <div class="field" style="min-width:160px">
       <label>Status</label>
       <select name="status" class="select-soft">
-        <option value="">— semua —</option>
+        <option value="">semua</option>
         @foreach(['draft'=>'Draft','sebagian'=>'Sebagian','lunas'=>'Lunas'] as $val=>$label)
           <option value="{{ $val }}" {{ request('status')===$val?'selected':'' }}>{{ $label }}</option>
         @endforeach
@@ -153,7 +153,7 @@
             $over  = $due && $sisa > 0 && $due->lt($today);
             $days  = $over ? $due->diffInDays($today) : 0;
             $bucket = $over
-              ? ($days <= 30 ? '0–30' : ($days <= 60 ? '31–60' : ($days <= 90 ? '61–90' : '>90')))
+              ? ($days <= 30 ? '0-30' : ($days <= 60 ? '31-60' : ($days <= 90 ? '61-90' : '>90')))
               : 'Current';
           @endphp
 
@@ -164,7 +164,7 @@
                   {{ $t->sekolah->nama_sekolah }}
                 </a>
               @else
-                —
+                -
               @endif
             </td>
 
@@ -172,8 +172,8 @@
               <a href="{{ route('tagihan.edit', $t->id) }}" class="text-decoration-none">{{ $t->nomor }}</a>
             </td>
 
-            <td>{{ $t->tanggal_tagihan ? Carbon::parse($t->tanggal_tagihan)->format('d/m/Y') : '—' }}</td>
-            <td>{{ $t->jatuh_tempo ? Carbon::parse($t->jatuh_tempo)->format('d/m/Y') : '—' }}</td>
+            <td>{{ $t->tanggal_tagihan ? Carbon::parse($t->tanggal_tagihan)->format('d/m/Y') : '-' }}</td>
+            <td>{{ $t->jatuh_tempo ? Carbon::parse($t->jatuh_tempo)->format('d/m/Y') : '-' }}</td>
 
             <td class="text-end">{{ rupiah($t->total) }}</td>
             <td class="text-end">{{ rupiah($t->terbayar) }}</td>
@@ -189,15 +189,11 @@
               @endif
             </td>
 
-            <td>
-              @php
-                $hp = $t->sekolah->no_hp ?? null;
-                $wa = $hp ? preg_replace('/\D+/', '', $hp) : null;
-              @endphp
-              @if($wa)
-                <a class="btn btn-success btn-sm round" target="_blank" href="https://wa.me/{{ $wa }}">WA</a>
-              @endif
-            </td>
+           <td>
+  <a class="btn btn-success btn-sm round" target="_blank" href="{{ route('tagihan.wa', $t->id) }}">
+    WA
+  </a>
+</td>
           </tr>
         @empty
           <tr>

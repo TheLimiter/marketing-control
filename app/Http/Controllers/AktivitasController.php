@@ -4,12 +4,46 @@ namespace App\Http\Controllers;
 
 use App\Models\MasterSekolah;
 use App\Models\AktivitasProspek;
+use App\Models\AktivitasFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\Storage;
 use App\Models\MasterSekolah as MS;
 use App\Models\User;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Carbon\Carbon; // <- Tambahkan ini
+use Carbon\Carbon;
+use App\Models\TagihanKlien;
+
+class AktivitasFileController extends Controller
+{
+    /**
+     * Izinkan preview image + PDF
+     */
+    public function preview(AktivitasFile $file)
+    {
+        // (opsional) authorize
+        if (!Storage::disk('public')->exists($file->path)) {
+            abort(404);
+        }
+
+        $mime = (string) $file->mime;
+
+        // Izinkan image ATAU PDF
+        if (!str_starts_with($mime, 'image/') && $mime !== 'application/pdf') {
+            // fallback: langsung download saja untuk tipe lain
+            return Storage::disk('public')->download($file->path, $file->original_name);
+        }
+
+        $absolute = Storage::disk('public')->path($file->path);
+        return response()->file($absolute, [
+            'Content-Type'        => $mime ?: 'application/octet-stream',
+            'Content-Disposition' => 'inline; filename="'.addslashes($file->original_name).'"',
+            'Cache-Control'       => 'public, max-age=31536000',
+        ]);
+    }
+}
+
+// app/Http/Controllers/AktivitasController.php
 
 class AktivitasController extends Controller
 {
@@ -27,7 +61,12 @@ class AktivitasController extends Controller
     private function baseAktivitasQuery(Request $r)
     {
         $q = AktivitasProspek::query()
-            ->with(['master:id,nama_sekolah,stage', 'creator:id,name', 'files:id,aktivitas_id,original_name,size'])
+            ->with([
+                'master:id,nama_sekolah,stage',
+                'creator:id,name',
+                'files:id,aktivitas_id,original_name,size,mime,path',
+                'paymentFiles:id,aktivitas_id,original_name,size,mime,path',
+            ])
             ->orderByDesc('tanggal')->orderByDesc('id');
 
         // Rentang tanggal
@@ -40,7 +79,7 @@ class AktivitasController extends Controller
 
         // Jenis (like)
         if ($r->filled('jenis')) {
-            $q->where('jenis', 'like', '%'.trim($r->jenis).'%');
+            $q->where('jenis', 'like', '%' . trim($r->jenis) . '%');
         }
 
         // Filter stage SEKARang (di tabel master)
@@ -58,8 +97,8 @@ class AktivitasController extends Controller
         if ($r->filled('q')) {
             $s = trim($r->q);
             $q->where(fn($w) =>
-                $w->where('hasil','like',"%{$s}%")
-                  ->orWhere('catatan','like',"%{$s}%")
+                $w->where('hasil', 'like', "%{$s}%")
+                    ->orWhere('catatan', 'like', "%{$s}%")
             );
         }
 
@@ -68,12 +107,18 @@ class AktivitasController extends Controller
             $q->where('created_by', (int) $r->user_id);
         }
 
-        // NEW: by user name (oleh)
+        // user name (oleh)
         if ($r->filled('oleh')) {
             $name = trim($r->oleh);
             $q->whereHas('creator', function($w) use ($name) {
-                $w->where('name','like','%'.$name.'%');
+                $w->where('name', 'like', '%' . $name . '%');
             });
+        }
+
+        if ($r->boolean('trashed')) {
+            $q->onlyTrashed();
+        } elseif ($r->boolean('with_trashed')) {
+            $q->withTrashed();
         }
 
         return $q;
@@ -88,25 +133,30 @@ class AktivitasController extends Controller
 
         // Page size
         $per = (int) $request->get('per', 25);
-        $per = in_array($per, [15,25,50,100]) ? $per : 25;
+        $per = in_array($per, [15, 25, 50, 100]) ? $per : 25;
 
         // Sorting
-        $sort = $request->get('sort','tanggal');
-        $dir  = strtolower($request->get('dir','desc')) === 'asc' ? 'asc' : 'desc';
+        $sort = $request->get('sort', 'tanggal');
+        $dir = strtolower($request->get('dir', 'desc')) === 'asc' ? 'asc' : 'desc';
 
-        // Hapus order bawaan
+        // Hapus ordering sebelumnya
         $q->reorder();
 
-        // NEW: sort by creator_name (users.name)
+        // sort by creator_name (users.name)
         if ($sort === 'creator_name') {
-            $table = (new AktivitasProspek())->getTable(); // aman kalau nama tabel custom
-            $q->leftJoin('users', 'users.id', '=', $table.'.created_by')
-              ->select($table.'.*')
-              ->orderBy('users.name', $dir);
+            $table = (new AktivitasProspek())->getTable();
+            $q->leftJoin('users', 'users.id', '=', $table . '.created_by')
+                ->select($table . '.*')
+                ->orderBy('users.name', $dir)
+                ->orderBy($table . '.tanggal', 'desc') // tie-breaker 1
+                ->orderBy($table . '.id', 'desc'); // tie-breaker 2
         } else {
-            $allowed = ['tanggal','jenis','created_at'];
-            if (! in_array($sort, $allowed)) $sort = 'tanggal';
-            $q->orderBy($sort, $dir);
+            $allowed = ['tanggal', 'jenis', 'created_at', 'id'];
+            if (!in_array($sort, $allowed)) {
+                $sort = 'tanggal';
+            }
+            $q->orderBy($sort, $dir)
+              ->orderBy('id', 'desc'); // pastikan yang terbaru di atas saat nilai sama
         }
 
         $items = $q->paginate($per)->withQueryString();
@@ -124,24 +174,24 @@ class AktivitasController extends Controller
 
         $jenisOptions = [];
         foreach ($distinctJenis as $j) {
-            $jenisOptions[$j] = ucwords(str_replace('_',' ', $j));
+            $jenisOptions[$j] = ucwords(str_replace('_', ' ', $j));
         }
 
-        return view('aktivitas.index', compact('items','stageOptions','jenisOptions'));
+        return view('aktivitas.index', compact('items', 'stageOptions', 'jenisOptions'));
     }
 
     /**
-     * Export CSV halaman GLOBAL (menghormati filter yang sama).
+     * Export CSV halaman GLOBAL
      */
     public function export(Request $request): StreamedResponse
     {
-        $rows = $this->baseAktivitasQuery($request)->limit(50000)->get(); // limit aman
+        $rows = $this->baseAktivitasQuery($request)->limit(50000)->get();
 
         $callback = function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Tanggal','Sekolah','Jenis','Hasil','Catatan','Oleh']);
+            fputcsv($out, ['Tanggal', 'Sekolah', 'Jenis', 'Hasil', 'Catatan', 'Oleh']);
             foreach ($rows as $r) {
-                $jenisDisp = ucwords(str_replace('_',' ', (string) $r->jenis));
+                $jenisDisp = ucwords(str_replace('_', ' ', (string) $r->jenis));
                 $hasilDisp = (string) $r->hasil;
 
                 fputcsv($out, [
@@ -169,61 +219,65 @@ class AktivitasController extends Controller
     {
         $q = AktivitasProspek::query()
             ->where('master_sekolah_id', $master->id)
-            ->with(['creator:id,name','files:id,aktivitas_id,original_name,size']);
+            ->with([
+                'creator:id,name',
+                'files:id,aktivitas_id,original_name,size,mime,path',
+                'paymentFiles:id,aktivitas_id,original_name,size,mime,path',
+            ]);
 
         // Filter text hasil/catatan
         if ($s = trim((string) $r->get('q', ''))) {
             $q->where(fn($w) =>
-                $w->where('hasil','like',"%{$s}%")
-                  ->orWhere('catatan','like',"%{$s}%")
+                $w->where('hasil', 'like', "%{$s}%")
+                    ->orWhere('catatan', 'like', "%{$s}%")
             );
         }
         // Jenis
         if ($jenis = $r->get('jenis')) {
-            $q->where('jenis', 'like', '%'.trim($jenis).'%');
+            $q->where('jenis', 'like', '%' . trim($jenis) . '%');
         }
-        // Rentang tanggal
+        // Rentang
         if ($from = $r->get('from')) {
             $q->whereDate('tanggal', '>=', $from);
         }
         if ($to = $r->get('to')) {
             $q->whereDate('tanggal', '<=', $to);
         }
-        // NEW: filter oleh (nama user)
+        // filter oleh (user)
         if ($r->filled('oleh')) {
             $oleh = trim($r->input('oleh'));
             $q->whereHas('creator', function($w) use ($oleh) {
-                $w->where('name','like','%'.$oleh.'%');
+                $w->where('name', 'like', '%' . $oleh . '%');
             });
         }
 
         // Page size
         $per = (int) $r->get('per', 25);
-        $per = in_array($per, [15,25,50,100]) ? $per : 25;
+        $per = in_array($per, [15, 25, 50, 100]) ? $per : 25;
 
         // Sorting
-        $sort = $r->get('sort','tanggal');
-        $dir  = strtolower($r->get('dir','desc')) === 'asc' ? 'asc' : 'desc';
+        $sort = $r->get('sort', 'tanggal');
+        $dir = strtolower($r->get('dir', 'desc')) === 'asc' ? 'asc' : 'desc';
 
         if ($sort === 'creator_name') {
             $table = (new AktivitasProspek())->getTable();
-            $q->leftJoin('users','users.id','=',$table.'.created_by')
-              ->select($table.'.*')
-              ->orderBy('users.name',$dir);
+            $q->leftJoin('users', 'users.id', '=', $table . '.created_by')
+                ->select($table . '.*')
+                ->orderBy('users.name', $dir)
+                ->orderBy($table.'.tanggal', 'desc') // tie-breaker 1
+                ->orderBy($table.'.id', 'desc'); // tie-breaker 2
         } else {
-            $allowed = ['tanggal','jenis','created_at'];
-            if (! in_array($sort, $allowed)) $sort = 'tanggal';
-            $q->orderBy($sort, $dir);
-        }
-
-        // Tambahkan tie-breaker id desc
-        if ($sort !== 'id') {
-            $q->orderBy('id', 'desc');
+            $allowed = ['tanggal', 'jenis', 'created_at', 'id'];
+            if (!in_array($sort, $allowed)) {
+                $sort = 'tanggal';
+            }
+            $q->orderBy($sort, $dir)
+              ->orderBy('id', 'desc');
         }
 
         $items = $q->paginate($per)->withQueryString();
 
-        // Opsi dropdown jenis (bila diperlukan)
+        // Opsi dropdown jenis
         $jenisOptions = [
             'kunjungan'      => 'Kunjungan',
             'meeting'        => 'Meeting',
@@ -234,18 +288,36 @@ class AktivitasController extends Controller
             'modul_done'     => 'Modul Selesai',
             'modul_reopen'   => 'Modul Reopen',
             'modul_attach'   => 'Lampiran Modul',
+            'billing_create' => 'Tagihan Dibuat',
+            'billing_payment'=> 'Tagihan Dibayar',
             'lainnya'        => 'Lainnya',
         ];
 
         // NEW (opsional): datalist nama user untuk auto-suggest
-        $creatorIds = AktivitasProspek::where('master_sekolah_id',$master->id)
-                         ->distinct()->pluck('created_by')->filter();
+        $creatorIds = AktivitasProspek::where('master_sekolah_id', $master->id)
+                                             ->distinct()->pluck('created_by')->filter();
         $creatorOptions = collect();
         if ($creatorIds->isNotEmpty()) {
-            $creatorOptions = User::whereIn('id',$creatorIds)->orderBy('name')->pluck('name');
+            $creatorOptions = User::whereIn('id', $creatorIds)->orderBy('name')->pluck('name');
         }
 
-        return view('master.aktivitas_index', compact('master','items','jenisOptions','creatorOptions'));
+        $invoiceSummary = TagihanKlien::selectRaw("
+            SUM(CASE WHEN COALESCE(terbayar,0) < COALESCE(total,0) THEN 1 ELSE 0 END) AS unpaid_count,
+            SUM(CASE WHEN COALESCE(terbayar,0) < COALESCE(total,0)
+                      THEN (COALESCE(total,0) - COALESCE(terbayar,0)) ELSE 0 END)      AS unpaid_sum,
+            SUM(CASE WHEN COALESCE(terbayar,0) >= COALESCE(total,0) AND COALESCE(total,0) > 0
+                      THEN 1 ELSE 0 END)                                                 AS paid_count
+        ")
+        ->where('master_sekolah_id', $master->id)
+        ->first();
+
+        return view('master.aktivitas_index', [
+            'master' => $master,
+            'items'  => $items,
+            'jenisOptions' => $jenisOptions,
+            'creatorOptions' => $creatorOptions,
+            'invoiceSummary' => $invoiceSummary,
+        ]);
     }
 
     /**
@@ -254,35 +326,30 @@ class AktivitasController extends Controller
     public function store(Request $request, MasterSekolah $master)
     {
         $payload = $request->validate([
-            // 'tanggal' JANGAN diterima dari user untuk default demo
-            'jenis'   => ['required','string','max:100'],
-            'hasil'   => ['required','string','max:150'],
-            'catatan' => ['nullable','string'],
-            'files.*' => ['file','max:5120', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx,ppt,pptx'],
+            'jenis'   => ['required', 'string', 'max:100'],
+            'hasil'   => ['required', 'string', 'max:150'],
+            'catatan' => ['nullable', 'string'],
+            'files.*' => ['file', 'max:5120', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx,ppt,pptx'],
         ]);
 
         $payload['master_sekolah_id'] = $master->id;
-        $payload['created_by']        = auth()->id();
-        $payload['tanggal']           = now(); // <- kunci dari server (detik ini)
-
-        // (Opsional) jika ingin admin bisa override tanggal (NON-wajib untuk demo)
-        // if ($request->user()->hasRole('admin') && $request->filled('tanggal')) {
-        //     $request->validate(['tanggal' => ['date','before_or_equal:now']]);
-        //     $payload['tanggal'] = Carbon::parse($request->input('tanggal'));
-        // }
+        $payload['created_by'] = auth()->id();
+        $payload['tanggal'] = now();
 
         $aktivitas = AktivitasProspek::create($payload);
 
         // Simpan lampiran kalau ada
         if ($request->hasFile('files')) {
             foreach ($request->file('files') as $f) {
-                if (!$f->isValid()) continue;
+                if (!$f->isValid()) {
+                    continue;
+                }
                 $path = $f->store('aktivitas', 'public');
                 $aktivitas->files()->create([
-                    'path'          => $path,
+                    'path' => $path,
                     'original_name' => $f->getClientOriginalName(),
-                    'size'          => $f->getSize(),
-                    'mime'          => $f->getMimeType(),
+                    'size' => $f->getSize(),
+                    'mime' => $f->getMimeType(),
                 ]);
             }
         }
@@ -294,7 +361,7 @@ class AktivitasController extends Controller
     {
         abort_unless($aktivitas->master_sekolah_id === $master->id, 404);
         $this->authorize('delete', $aktivitas);
-        $aktivitas->delete(); // SoftDeletes di model
+        $aktivitas->delete();
         return back()->with('ok', 'Aktivitas dipindahkan ke Riwayat.');
     }
 
@@ -310,12 +377,12 @@ class AktivitasController extends Controller
 
         $jenisOptions = [
             'kunjungan' => 'Kunjungan',
-            'lainnya'   => 'Lainnya',
+            'lainnya' => 'Lainnya',
         ];
 
         return view('master.aktivitas_index', [
             'master' => $master,
-            'items'  => $items,
+            'items' => $items,
             'jenisOptions' => $jenisOptions,
             'showTrash' => true,
         ]);
@@ -349,21 +416,21 @@ class AktivitasController extends Controller
     public function bulk(Request $r)
     {
         // Hanya admin
-        if (! $r->user()->hasRole('admin')) {
+        if (!$r->user()->hasRole('admin')) {
             return back()->with('err', 'Aksi massal hanya untuk admin.');
         }
 
         $data = $r->validate([
             'action' => 'required|in:delete,export',
-            'ids'    => 'required|array',
-            'ids.*'  => 'integer',
+            'ids' => 'required|array',
+            'ids.*' => 'integer',
         ]);
 
         $ids = array_unique($data['ids']);
 
         if ($data['action'] === 'delete') {
-            AktivitasProspek::whereIn('id', $ids)->delete(); // Soft delete
-            return back()->with('ok', count($ids).' aktivitas dihapus.');
+            AktivitasProspek::whereIn('id', $ids)->delete();
+            return back()->with('ok', count($ids) . ' aktivitas dihapus.');
         }
 
         // EXPORT CSV TERPILIH
@@ -372,11 +439,11 @@ class AktivitasController extends Controller
             ->orderByDesc('tanggal')->orderByDesc('id')
             ->get();
 
-        $filename = 'aktivitas_selected_'.now()->format('Ymd_His').'.csv';
+        $filename = 'aktivitas_selected_' . now()->format('Ymd_His') . '.csv';
 
-        return \Response::streamDownload(function() use ($rows){
+        return \Response::streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['ID','Tanggal','Sekolah','Jenis','Hasil','Catatan','Oleh']);
+            fputcsv($out, ['ID', 'Tanggal', 'Sekolah', 'Jenis', 'Hasil', 'Catatan', 'Oleh']);
             foreach ($rows as $r) {
                 fputcsv($out, [
                     $r->id,
@@ -395,14 +462,14 @@ class AktivitasController extends Controller
     public function bulkPerSekolah(Request $r, MasterSekolah $master)
     {
         // Hanya admin
-        if (! $r->user()->hasRole('admin')) {
+        if (!$r->user()->hasRole('admin')) {
             return back()->with('err', 'Aksi massal hanya untuk admin.');
         }
 
         $data = $r->validate([
             'action' => 'required|in:delete,export',
-            'ids'    => 'required|array',
-            'ids.*'  => 'integer',
+            'ids' => 'required|array',
+            'ids.*' => 'integer',
         ]);
 
         $ids = array_unique($data['ids']);
@@ -412,15 +479,15 @@ class AktivitasController extends Controller
 
         if ($data['action'] === 'delete') {
             $q->delete();
-            return back()->with('ok', count($ids).' aktivitas dihapus.');
+            return back()->with('ok', count($ids) . ' aktivitas dihapus.');
         }
 
         $rows = $q->with(['creator:id,name'])->orderByDesc('tanggal')->orderByDesc('id')->get();
-        $filename = 'aktivitas_'.$master->id.'_selected_'.now()->format('Ymd_His').'.csv';
+        $filename = 'aktivitas_' . $master->id . '_selected_' . now()->format('Ymd_His') . '.csv';
 
-        return \Response::streamDownload(function() use ($rows){
+        return \Response::streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['ID','Tanggal','Jenis','Hasil','Catatan','Oleh']);
+            fputcsv($out, ['ID', 'Tanggal', 'Jenis', 'Hasil', 'Catatan', 'Oleh']);
             foreach ($rows as $r) {
                 fputcsv($out, [
                     $r->id,

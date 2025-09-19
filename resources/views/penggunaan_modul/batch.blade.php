@@ -3,7 +3,7 @@
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h5 class="mb-0">Tambah Modul (Batch)</h5>
-  <a href="{{ url()->previous() }}" class="btn btn-sm btn-outline-secondary">← Kembali</a>
+  <a href="{{ url()->previous() }}" class="btn btn-sm btn-outline-secondary">Kembali</a>
 </div>
 
 <form method="post" action="{{ route('penggunaan-modul.batch-store') }}" class="card p-3">

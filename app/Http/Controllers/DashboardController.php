@@ -21,12 +21,12 @@ class DashboardController extends Controller
 
         $klienTanpaMou = MS::where('stage', MS::ST_KLIEN)->whereNull('mou_path')->count();
 
-        // Minggu ini (mulai Senin / startOfWeek app timezone)
+        // Minggu ini (startOfWeek app timezone)
         $start = now()->startOfWeek();
 
-        // “Masuk Prospek” minggu ini → deteksi log stage_change ...→2 (ST_PROSPEK)
+        //Masuk Prospek minggu ini deteksi log stage_change
         $prospekThisWeek = AktivitasProspek::where('jenis', 'stage_change')
-            ->where('hasil', 'like', '%→' . MS::ST_PROSPEK)
+            ->where('hasil', 'like', '' . MS::ST_PROSPEK)
             ->where('tanggal', '>=', $start)
             ->count();
 
@@ -35,7 +35,7 @@ class DashboardController extends Controller
             ->where('tanggal', '>=', $start)
             ->count();
 
-        // Aktivitas terbaru (tampilkan nama sekolah)
+        // Aktivitas terbaru
         $recent = AktivitasProspek::with(['master:id,nama_sekolah'])
             ->select('id','master_sekolah_id','jenis','hasil','catatan','tanggal')
             ->latest('tanggal')
@@ -45,13 +45,12 @@ class DashboardController extends Controller
         // format tampilan untuk kolom "Jenis" & "Hasil"
         $recent->transform(function ($r) {
             if ($r->jenis === 'stage_change') {
-                // hasil disimpan spt "1→2", ambil angkanya
                 $from = $to = null;
                 if (preg_match('/(\d+)\D+(\d+)/', (string) $r->hasil, $m)) {
                     $from = (int) $m[1];
                     $to   = (int) $m[2];
                 }
-                $r->display_jenis = MS::stageLabel($from) . ' → ' . MS::stageLabel($to); // contoh: Prospek → Klien
+                $r->display_jenis = MS::stageLabel($from) . ' ' . MS::stageLabel($to); // contoh: Prospek Klien
                 $r->display_hasil = 'Pindah Tahap';
                 $r->badge_class   = 'info';
             } elseif ($r->jenis === 'mou_update') {

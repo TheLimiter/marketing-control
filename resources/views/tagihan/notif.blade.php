@@ -1,4 +1,4 @@
-<h4 class="mb-3">Daftar Notifikasi – {{ $tagihan->klien->nama ?? '—' }}</h4>
+<h4 class="mb-3">Daftar Notifikasi {{ $tagihan->klien->nama ?? '-' }}</h4>
 
 <table class="table">
   <thead>

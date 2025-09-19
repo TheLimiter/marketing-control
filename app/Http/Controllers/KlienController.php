@@ -73,7 +73,7 @@ class KlienController extends Controller
             'jenjang'    => $calon->jenjang ?? null,
         ]);
 
-        // --- Pastikan nilai MOU/TTD DISALIN SELALU (baru atau sudah ada) ---
+        // MOU/TTD DISALIN SELALU (baru atau sudah ada) ---
         if (\Schema::hasColumn('klien','tanggal_mou')) $klien->tanggal_mou = $tglMou;
         if (\Schema::hasColumn('klien','mou_file'))    $klien->mou_file    = $mouFile;
         if (\Schema::hasColumn('klien','mou_path') && !$klien->mou_file) {

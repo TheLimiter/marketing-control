@@ -123,8 +123,8 @@
                         </td>
 
                         <td>
-                            {{ $r->pengguna_nama ?: '—' }}
-                            <div class="small text-muted">{{ $r->pengguna_kontak ?: '—' }}</div>
+                            {{ $r->pengguna_nama ?: '-' }}
+                            <div class="small text-muted">{{ $r->pengguna_kontak ?: '-' }}</div>
                         </td>
 
                         <td>{{ $r->modul->nama ?? '-' }}</td>
@@ -132,13 +132,12 @@
                         {{-- Periode (highlight cell) --}}
                         <td class="text-nowrap small text-muted {{ $ageCellClass }}">
                             {{ $r->mulai_tanggal ? \Illuminate\Support\Carbon::parse($r->mulai_tanggal)->format('d/m/Y') : '' }}
-                            –
-                            {{ $r->akhir_tanggal ? \Illuminate\Support\Carbon::parse($r->akhir_tanggal)->format('d/m/Y') : '∞' }}
+                            {{ $r->akhir_tanggal ? \Illuminate\Support\Carbon::parse($r->akhir_tanggal)->format('d/m/Y') : '' }}
                         </td>
 
                         {{-- Terakhir digunakan (ikut di-highlight agar konsisten) --}}
                         <td class="text-nowrap small text-muted {{ $ageCellClass }}">
-                            {{ $r->last_used_at ? \Illuminate\Support\Carbon::parse($r->last_used_at)->diffForHumans() : '—' }}
+                            {{ $r->last_used_at ? \Illuminate\Support\Carbon::parse($r->last_used_at)->diffForHumans() : '-' }}
                         </td>
 
                         <td>
