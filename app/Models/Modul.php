@@ -28,4 +28,12 @@ class Modul extends Model
     ];
 
     public function scopeAktif($q){ return $q->where('aktif', 1); }
+
+    // === RELASI ===
+    public function tagihan()
+    {
+        return $this->belongsToMany(TagihanKlien::class, 'tagihan_modul', 'modul_id', 'tagihan_id')
+                    ->withPivot(['keterangan'])
+                    ->withTimestamps();
+    }
 }

@@ -13,7 +13,7 @@ class AktivitasProspek extends Model
     protected $table = 'aktivitas_prospek';
 
     protected $fillable = [
-        'master_sekolah_id','prospek_id','tanggal','jenis','hasil','catatan','created_by'
+    'master_sekolah_id', 'modul_id', 'prospek_id', 'tanggal', 'jenis', 'hasil', 'catatan', 'created_by'
     ];
 
     protected $casts = ['tanggal' => 'datetime'];
@@ -45,12 +45,12 @@ class AktivitasProspek extends Model
             'whatsapp'         => 'WhatsApp',
             'email'            => 'Email',
             'lainnya'          => 'Lainnya',
-            // kalau masih ada event lama:
+            // jika masih ada event lama:
             'prospek.to_klien' => 'Konversi ke Klien',
         ];
 
         if (isset($map[$this->jenis])) {
-            return $map[$this->jenis]; // <- perbaikan dari $thisu
+            return $map[$this->jenis];
         }
 
         return Str::headline(str_replace('.', ' ', (string) $this->jenis));
@@ -62,11 +62,14 @@ class AktivitasProspek extends Model
         $hasil = $this->hasil;
 
         if ($this->jenis === 'stage_change' && $hasil) {
-            if (preg_match('/(\d+)\s*(?:|->|to)\s*(\d+)/i', $hasil, $m)) {
+            // dukung format "1->2", "1 → 2", "1 to 2", "1-2", "1 > 2", dll
+            if (preg_match('/(\d+)\s*(?:->|→|to|-|—|>)\s*(\d+)/i', $hasil, $m)) {
                 $from = (int) $m[1];
                 $to   = (int) $m[2];
-                return MasterSekolah::stageLabel($from) . '' . MasterSekolah::stageLabel($to);
+                return MasterSekolah::stageLabel($from) . ' → ' . MasterSekolah::stageLabel($to);
             }
+            // fallback: tampilkan apa adanya jika pola tak terbaca
+            return $hasil;
         }
 
         if ($this->jenis === 'module_status' && $hasil) {
@@ -98,7 +101,7 @@ class AktivitasProspek extends Model
             'lainnya'        => 'bg-light text-dark',
         ];
 
-        return 'rounded-pill '.($map[$k] ?? 'bg-secondary text-white');
+        return 'rounded-pill ' . ($map[$k] ?? 'bg-secondary text-white');
     }
 
     // --- alias yang dipakai di Blade ---
@@ -106,7 +109,7 @@ class AktivitasProspek extends Model
     {
         // khusus stage_change: tampilkan arah kalau bisa dibaca dari hasil
         if ($this->jenis === 'stage_change' && ($h = $this->getHasilLabelAttribute())) {
-            return $h; // Prospek Negosiasi, dsb.
+            return $h; // contoh: "Calon → sudah dihubungi"
         }
         return $this->getJenisLabelAttribute();
     }

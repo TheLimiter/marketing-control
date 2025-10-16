@@ -23,11 +23,23 @@ class MasterSekolah extends Model
         'stage','stage_changed_at','created_by','updated_by',
     ];
 
-    public const ST_CALON = 1;
-    public const ST_PROSPEK = 2;
-    public const ST_NEGOSIASI = 3;
-    public const ST_MOU = 4;
-    public const ST_KLIEN = 5;
+    /**
+     * Mapping stage BARU:
+     * 1 = Calon
+     * 2 = sudah dihubungi
+     * 3 = sudah dilatih
+     * 4 = MOU Aktif
+     * 5 = Tindak lanjut MOU
+     * 6 = Ditolak
+     *
+     * Pastikan nilai integer sesuai data yang ada di DB.
+     */
+    public const ST_CALON  = 1;
+    public const ST_SHB    = 2; // sudah dihubungi
+    public const ST_SLTH   = 3; // sudah dilatih
+    public const ST_MOU    = 4; // MOU Aktif
+    public const ST_TLMOU  = 5; // Tindak lanjut MOU
+    public const ST_TOLAK  = 6; // Ditolak
 
     protected $casts = [
         'stage'            => 'integer',
@@ -35,7 +47,7 @@ class MasterSekolah extends Model
         'ttd_status'       => 'boolean',
     ];
 
-    // -------- Accessors --------
+    // ---------- Accessors ----------
     public function getMouOkAttribute(): bool
     {
         return (bool) ($this->mou_path ?? false);
@@ -64,22 +76,30 @@ class MasterSekolah extends Model
         return $total > 0 ? (int) round(100 * $done / $total) : 0;
     }
 
+    // ---------- Stage helpers ----------
+    public const STAGE_LABELS = [
+        self::ST_CALON => 'Calon',
+        self::ST_SHB   => 'sudah dihubungi',
+        self::ST_SLTH  => 'sudah dilatih',
+        self::ST_MOU   => 'MOU Aktif',
+        self::ST_TLMOU => 'Tindak lanjut MOU',
+        self::ST_TOLAK => 'Ditolak',
+    ];
+
     // Label stage: terima null agar tidak TypeError
     public static function stageLabel(?int $s): string
     {
         $s ??= self::ST_CALON;
-
-        return match ($s) {
-            self::ST_CALON      => 'Calon',
-            self::ST_PROSPEK    => 'Prospek',
-            self::ST_NEGOSIASI  => 'Negosiasi',
-            self::ST_MOU        => 'MOU',
-            self::ST_KLIEN      => 'Klien',
-            default             => (string) $s,
-        };
+        return self::STAGE_LABELS[$s] ?? (string) $s;
     }
 
-    // -------- Scopes --------
+    // Opsi lengkap (berguna untuk dropdown)
+    public static function stageOptions(): array
+    {
+        return self::STAGE_LABELS;
+    }
+
+    // ---------- Scopes ----------
     public function scopeCalon(Builder $q): Builder
     {
         return $q->where('status_klien', 'calon');
@@ -113,15 +133,15 @@ class MasterSekolah extends Model
             : $q->where(fn ($x) => $x->whereNull('ttd_status')->orWhere('ttd_status', 0));
     }
 
-    // -------- Stage Ops --------
+    // ---------- Stage Ops ----------
     public function moveToStage(int $to, ?string $note = null): void
     {
         $from = (int) ($this->getOriginal('stage') ?? self::ST_CALON);
 
-        // Enforce MOU sebelum Klien jika diaktifkan
+        // (Opsional) Wajib MOU sebelum Tindak lanjut MOU jika require_mou_ttd=true
         $require = (bool) config('biz.require_mou_ttd', false);
-        if ($require && $to === self::ST_KLIEN && (int) ($this->stage ?? 0) < self::ST_MOU) {
-            throw new \DomainException('Set MOU terlebih dahulu sebelum jadi Klien.');
+        if ($require && $to === self::ST_TLMOU && (int) ($this->stage ?? 0) < self::ST_MOU) {
+            throw new \DomainException('Set MOU terlebih dahulu sebelum Tindak lanjut MOU.');
         }
 
         $this->forceFill([
@@ -152,16 +172,17 @@ class MasterSekolah extends Model
     protected function getEntityType(): string
     {
         return match ($this->stage) {
-            self::ST_CALON     => 'calon',
-            self::ST_PROSPEK   => 'prospek',
-            self::ST_NEGOSIASI => 'negosiasi',
-            self::ST_MOU       => 'mou',
-            self::ST_KLIEN     => 'klien',
-            default            => 'sekolah',
+            self::ST_CALON  => 'calon',
+            self::ST_SHB    => 'sudah_dihubungi',
+            self::ST_SLTH   => 'sudah_dilatih',
+            self::ST_MOU    => 'mou_aktif',
+            self::ST_TLMOU  => 'tindak_lanjut_mou',
+            self::ST_TOLAK  => 'ditolak',
+            default         => 'sekolah',
         };
     }
 
-    // -------- Relasi --------
+    // ---------- Relasi ----------
     public function mouRows()
     {
         return $this->hasMany(Mou::class, 'master_sekolah_id');

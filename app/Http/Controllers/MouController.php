@@ -78,4 +78,22 @@ class MouController extends Controller
             ->route('master.index')
             ->with('ok', 'MOU/TTD tersimpan.');
     }
+
+    // --- BARU: Metode untuk preview & download ---
+    public function preview(MasterSekolah $master)
+    {
+        if (!$master->mou_path || !Storage::disk('public')->exists($master->mou_path)) {
+            abort(404);
+        }
+        return response()->file(Storage::disk('public')->path($master->mou_path));
+    }
+
+    public function download(MasterSekolah $master)
+    {
+        if (!$master->mou_path || !Storage::disk('public')->exists($master->mou_path)) {
+            abort(404);
+        }
+        return Storage::disk('public')->download($master->mou_path, 'MOU-' . $master->nama_sekolah . '.pdf');
+    }
 }
+

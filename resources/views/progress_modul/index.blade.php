@@ -2,211 +2,244 @@
 
 @php
     use Carbon\Carbon;
+    use Illuminate\Support\Str;
 
-    // Query-string
-    $search   = request('q', $search ?? '');
-    $status   = request('status');
-    $sort     = request('sort','updated_desc');
-    $perPage  = (int) request('per_page', $rows->perPage() ?? 15);
+    // --- Data dari Controller ---
+    $search       = request('q', $search ?? '');
+    $sort         = request('sort', 'updated_desc');
+    $perPage      = (int) request('per_page', 15);
+    $totalSekolah = $items->total() ?? 0;
 
-    // Ringkasan halaman berjalan
-    $totalSekolah = $rows->count();
-    $totalModul   = $rows->sum('total_modul');
-    $totalSelesai = $rows->sum('selesai');
-    $avgProgress  = $totalSekolah ? round($rows->avg('progress_percent')) : 0;
+    // --- Data Ringkasan ---
+    $summaryData  = $summary ?? [];
+    $totalModul   = (int) ($summaryData['total_modul'] ?? 0);
+    $totalSelesai = (int) ($summaryData['total_selesai'] ?? 0);
+    $avgProgress  = $totalSekolah ? round((float)($summaryData['avg_progress'] ?? 0)) : 0;
 
-    // Helper tampilan
-    $progressClass = fn($p)=> $p>=100?'bg-success':($p>=75?'bg-primary':($p>=50?'bg-info':($p>=25?'bg-warning':'bg-secondary')));
-    $statusBadge   = fn($p)=> $p>=100?['Selesai','success']:($p>=75?['On Track','primary']:($p>=25?['Berjalan','warning']:($p>0?['Baru Mulai','info']:['Belum Mulai','secondary'])));
+    // --- Helper Tampilan ---
+    $statusBadge = function (int $p) {
+        if ($p >= 100) return ['Selesai', 'success'];
+        if ($p >= 75) return ['On Track', 'primary'];
+        if ($p >= 25) return ['Berjalan', 'warning'];
+        if ($p > 0) return ['Baru Mulai', 'info'];
+        return ['Belum Mulai', 'secondary'];
+    };
+
+    $stageBadgeColors = ['dilatih' => 'secondary', 'didampingi' => 'info', 'mandiri' => 'success'];
+    $stageSummary = function($row) use ($stageBadgeColors) {
+        $dil = (int) ($row->cnt_dilatih ?? 0);
+        $did = (int) ($row->cnt_didampingi ?? 0);
+        $man = (int) ($row->cnt_mandiri ?? 0);
+        $tot = (int) ($row->total_modul ?? 0);
+        $counts = "Dilatih:$dil · Didampingi:$did · Mandiri:$man";
+
+        if ($tot === 0) return ['label' => null, 'badge' => 'secondary', 'title' => '—', 'counts' => $counts];
+        if ($man > 0 && $man >= $did && $man >= $dil) return ['label' => 'Mandiri', 'badge' => $stageBadgeColors['mandiri'], 'title' => $counts, 'counts' => $counts];
+        if ($did > 0 && $did >= $dil) return ['label' => 'Didampingi', 'badge' => $stageBadgeColors['didampingi'], 'title' => $counts, 'counts' => $counts];
+        return ['label' => 'Dilatih', 'badge' => $stageBadgeColors['dilatih'], 'title' => $counts, 'counts' => $counts];
+    };
 @endphp
 
-@section('content')
-    {{-- HIGHLIGHT KOLOM: lokal saja --}}
-    <style>
-      .cell-warning, .cell-danger { position: relative; }
-      /* full-cell tint yang ringan + strip kiri agar ke-notice */
-      .cell-warning { background: rgba(245,158,11,.10) !important; box-shadow: inset 4px 0 0 0 #f59e0b; }
-      .cell-danger  { background: rgba(239,68,68,.12) !important; box-shadow: inset 4px 0 0 0 #ef4444; }
-    </style>
+@push('styles')
+<style>
+/* =========================================================
+   Static Width Table Layout
+   ========================================================= */
+:root {
+    --border-color: #e5e7eb;
+    --header-bg: #f9fafb;
+    --row-hover-bg: #f9fafb;
+    --text-primary: #111827;
+    --text-secondary: #6b7280;
+    --radius: 8px;
+}
+.table-container {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    overflow-x: auto;
+    background-color: #fff;
+}
+.static-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed; /* Kunci utama agar lebar kolom konsisten */
+}
+.static-table th,
+.static-table td {
+    padding: 12px 15px;
+    vertical-align: middle;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+    /* FIX: Mencegah teks terlalu panjang merusak layout */
+    word-break: break-word;
+}
+.static-table th {
+    background-color: var(--header-bg);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+.static-table tbody tr:last-child td {
+    border-bottom: none;
+}
+.static-table tbody tr:hover {
+    background-color: var(--row-hover-bg);
+}
 
+/* Penentuan Lebar Kolom */
+.col-sekolah { width: 280px; }
+.col-modul   { width: 110px; }
+.col-stage   { width: 220px; }
+.col-update  { width: 160px; }
+.col-catatan { width: 250px; }
+.col-aksi    { width: 100px; text-align: center; }
+
+/* Override Perataan Teks */
+.static-table .col-modul,
+.static-table .col-aksi {
+    text-align: center;
+}
+
+/* Utilitas */
+.ellipsis-wrapper {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.fw-semibold { font-weight: 600; color: var(--text-primary); }
+.small-muted { font-size: 0.9em; color: var(--text-secondary); }
+.text-mono { font-variant-numeric: tabular-nums; }
+.empty-state-cell {
+    text-align: center;
+    padding: 40px;
+}
+</style>
+@endpush
+
+@section('content')
+<div class="anima-scope">
     {{-- Header --}}
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <div class="h-page">Progress Modul Sekolah</div>
-            <div class="subtle">Monitoring Status instalasi modul per sekolah</div>
+            <div class="subtle">Monitoring status penggunaan modul per sekolah</div>
         </div>
-        <a href="{{ route('penggunaan-modul.create') }}" class="btn btn-primary round">
-            <i class="bi bi-plus-lg me-1"></i> Tambah Penggunaan
-        </a>
     </div>
 
     {{-- Ringkasan cepat --}}
     <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3"><div class="card elev-1"><div class="card-body py-3">
-            <div class="eyebrow">Sekolah (halaman ini)</div>
-            <div class="fs-5 fw-semibold">{{ $totalSekolah }}</div>
-        </div></div></div>
-        <div class="col-6 col-md-3"><div class="card elev-1"><div class="card-body py-3">
-            <div class="eyebrow">Total Modul</div>
-            <div class="fs-5 fw-semibold">{{ number_format($totalModul) }}</div>
-        </div></div></div>
-        <div class="col-6 col-md-3"><div class="card elev-1"><div class="card-body py-3">
-            <div class="eyebrow">Selesai</div>
-            <div class="fs-5 fw-semibold">{{ number_format($totalSelesai) }}</div>
-        </div></div></div>
-        <div class="col-6 col-md-3"><div class="card elev-1"><div class="card-body py-3">
-            <div class="eyebrow mb-1 d-flex justify-content-between align-items-center">
-                <span>Rata-rata Progress</span>
-                <span class="text-secondary">{{ $avgProgress }}%</span>
-            </div>
-            <div class="progress" style="height:8px">
-                <div class="progress-bar {{ $progressClass($avgProgress) }}" style="width: {{ $avgProgress }}%"></div>
-            </div>
-        </div></div></div>
+        <div class="col-6 col-md-3"><div class="card elev-1"><div class="card-body py-3"><div class="eyebrow">Total Sekolah</div><div class="fs-5 fw-semibold">{{ $totalSekolah }}</div></div></div></div>
+        <div class="col-6 col-md-3"><div class="card elev-1"><div class="card-body py-3"><div class="eyebrow">Total Modul Terpasang</div><div class="fs-5 fw-semibold">{{ number_format($totalModul) }}</div></div></div></div>
+        <div class="col-6 col-md-3"><div class="card elev-1"><div class="card-body py-3"><div class="eyebrow">Total Modul Selesai</div><div class="fs-5 fw-semibold">{{ number_format($totalSelesai) }}</div></div></div></div>
+        <div class="col-6 col-md-3"><div class="card elev-1"><div class="card-body py-3"><div class="eyebrow">Rata-rata Kemajuan</div><div class="fs-5 fw-semibold">{{ $avgProgress }}%</div></div></div></div>
     </div>
 
     {{-- Filter --}}
     <form method="get" class="card card-toolbar mb-4">
         <div class="toolbar">
-            <div class="field flex-grow-1" style="min-width:260px">
-                <label>Cari Sekolah</label>
-                <input type="text" name="q" value="{{ $search }}" class="input-soft" placeholder="Ketik nama sekolah">
-            </div>
-            <div class="field" style="min-width:200px">
-                <label>Status</label>
-                <select name="status" class="select-soft">
-                    <option value="">Semua Status</option>
-                    <option value="done"    @selected($status==='done')>Selesai (100%)</option>
-                    <option value="ontrack" @selected($status==='ontrack')>On Track (75%)</option>
-                    <option value="berjalan"@selected($status==='berjalan')>Berjalan (25%)</option>
-                    <option value="baru"    @selected($status==='baru')>Baru Mulai (>0%)</option>
-                    <option value="belum"   @selected($status==='belum')>Belum Mulai (0%)</option>
-                </select>
-            </div>
-            <div class="field" style="min-width:220px">
-                <label>Urutkan</label>
-                <select name="sort" class="select-soft">
-                    <option value="updated_desc"  @selected($sort==='updated_desc')>Update Terakhir</option>
-                    <option value="updated_asc"   @selected($sort==='updated_asc')>Update Terakhir</option>
-                    <option value="progress_desc" @selected($sort==='progress_desc')>Progress</option>
-                    <option value="progress_asc"  @selected($sort==='progress_asc')>Progress</option>
-                    <option value="school_asc"    @selected($sort==='school_asc')>Sekolah A-Z</option>
-                    <option value="school_desc"   @selected($sort==='school_desc')>Sekolah Z-A</option>
-                </select>
-            </div>
-            <div class="field" style="min-width:150px">
-                <label>Per Halaman</label>
-                <select name="per_page" class="select-soft" onchange="this.form.submit()">
-                    @foreach([10,15,25,50] as $pp)
-                        <option value="{{ $pp }}" @selected($perPage===$pp)>{{ $pp }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="ms-auto d-flex align-items-end gap-2">
-                <button class="btn btn-primary round"><i class="bi bi-filter me-1"></i> Terapkan</button>
-                @if(request()->hasAny(['q','status','sort']) || (request('per_page') && $perPage != 15))
-                    <a href="{{ route('progress.index') }}" class="btn btn-ghost round"><i class="bi bi-x-circle me-1"></i> Reset</a>
-                @endif
-            </div>
+            <div class="field flex-grow-1" style="min-width:260px"><label>Cari Sekolah</label><input type="text" name="q" value="{{ $search }}" class="input-soft" placeholder="Ketik nama sekolah"></div>
+            <div class="field" style="min-width:220px"><label>Urutkan</label><select name="sort" class="select-soft" onchange="this.form.submit()"><option value="updated_desc" @selected($sort === 'updated_desc')>Update Terakhir ↓</option><option value="updated_asc" @selected($sort === 'updated_asc')>Update Terakhir ↑</option><option value="progress_desc" @selected($sort === 'progress_desc')>Progress ↓</option><option value="progress_asc" @selected($sort === 'progress_asc')>Progress ↑</option><option value="school_asc" @selected($sort === 'school_asc')>Sekolah A–Z</option><option value="school_desc" @selected($sort === 'school_desc')>Sekolah Z–A</option></select></div>
+            <div class="ms-auto d-flex align-items-end gap-2"><button type="submit" class="btn btn-primary round"><i class="bi bi-filter me-1"></i> Terapkan</button>@if(request()->hasAny(['q','status','sort']))<a href="{{ route('progress.index') }}" class="btn btn-ghost round"><i class="bi bi-x-circle me-1"></i> Reset</a>@endif</div>
         </div>
     </form>
 
-    {{-- Tabel --}}
+    {{-- Tabel Static --}}
     <div class="card p-0">
-        <div class="table-responsive">
-            <table class="table table-modern table-compact table-sm align-middle mb-0">
+        <div class="table-container">
+            <table class="static-table">
                 <thead>
                     <tr>
-                        <th style="min-width:240px">Sekolah</th>
-                        <th class="text-center" style="width:10%;">Total Modul</th>
-                        <th class="text-center" style="width:10%;">Selesai</th>
-                        <th style="width:30%;">Progress</th>
-                        <th style="min-width:160px;">Update Terakhir</th>
-                        <th class="text-end" style="width:10%;">Aksi</th>
+                        <th class="col-sekolah">Sekolah</th>
+                        <th class="col-modul">Total Modul</th>
+                        <th class="col-stage">Stage Penggunaan</th>
+                        <th class="col-update">Update Terakhir</th>
+                        <th class="col-catatan">Catatan Terakhir</th>
+                        <th class="col-aksi">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse($rows as $r)
+                    @forelse($items as $item)
                         @php
-                            // $rows berasal dari MasterSekolah, jadi $r->id adalah ID master
-                            $masterId = $r->id;
-                            $p = (int) ($r->progress_percent ?? 0);
-                            [$label,$variant] = $statusBadge($p);
+                            $masterId = $item->master_sekolah_id ?? $item->id;
+                            $progress = (int) ($item->progress_percent ?? 0);
+                            [$progressLabel, $progressVariant] = $statusBadge($progress);
 
-                            $updatedHuman = $r->last_update ? Carbon::parse($r->last_update)->diffForHumans() : '-';
-                            $updatedExact = $r->last_update ? Carbon::parse($r->last_update)->format('d/m/Y H:i') : '-';
+                            $lastUpdate = $item->last_update ?? $item->last_used_at;
+                            $updatedHuman = $lastUpdate ? Carbon::parse($lastUpdate)->diffForHumans() : '—';
+                            $updatedExact = $lastUpdate ? Carbon::parse($lastUpdate)->format('d/m/Y H:i') : '—';
 
-                            $isStale = $p < 100 && $r->last_update && Carbon::parse($r->last_update)->lt(now()->subDays(7));
+                            $stage = $stageSummary($item);
 
-                            // indikator agregat (dari controller)
-                            $isOverdueRow = (int)($r->overdue_cnt ?? 0) > 0;
-                            $isAgingRow   = !$isOverdueRow && (int)($r->aging_cnt ?? 0) > 0;
-                            $ageCellClass = $isOverdueRow ? 'cell-danger' : ($isAgingRow ? 'cell-warning' : '');
+                            // Logika untuk mengambil catatan terakhir
+                            $lastNote = '-';
+                            if (!empty($item->latest_activity_data)) {
+                                [$catatan, $hasil] = array_pad(explode('|||', $item->latest_activity_data, 2), 2, '');
+                                $lastNote = trim($catatan) ?: trim($hasil) ?: '-';
+                            }
                         @endphp
                         <tr>
-                            <td>
-                                <div class="fw-semibold">
-                                    <a href="{{ route('progress.show', ['master' => $masterId]) }}" class="text-decoration-none">
-                                        {{ $r->nama_sekolah ?? '-' }}
-                                    </a>
-                                </div>
-                                <div class="small text-muted">
-                                    <span class="badge rounded-pill text-bg-{{ $variant }}">{{ $label }}</span>
-                                    @if(!empty($r->jenjang))
-                                        <span class="small text-uppercase">{{ $r->jenjang }}</span>
-                                    @endif
+                            <td class="col-sekolah">
+                                <a href="{{ route('progress.show', ['master' => $masterId]) }}" class="text-decoration-none ellipsis-wrapper fw-semibold">{{ $item->nama_sekolah ?? '-' }}</a>
+                                <div class="small-muted">
+                                    <span class="badge-stage {{ $progressVariant }}">{{ $progressLabel }}</span>
                                 </div>
                             </td>
-                            <td class="text-center">{{ $r->total_modul }}</td>
-                            <td class="text-center">{{ $r->selesai }}</td>
-
-                            {{-- kolom progress diberi highlight --}}
-                            <td class="{{ $ageCellClass }}">
-                                <div class="d-flex align-items-center gap-2">
-                                    <div class="progress flex-grow-1" role="progressbar" aria-valuenow="{{ $p }}" aria-valuemin="0" aria-valuemax="100" style="height:18px">
-                                        <div class="progress-bar {{ $progressClass($p) }}" style="width: {{ $p }}%;">
-                                            {{ $p }}%
-                                        </div>
-                                    </div>
-                                    @if($isStale)
-                                        <span class="badge text-bg-danger" title="Terakhir update {{ $updatedHuman }} ({{ $updatedExact }})">Stagnan</span>
-                                    @endif
+                            <td class="col-modul text-mono fw-bold fs-5">{{ $item->total_modul ?? 0 }}</td>
+                            <td class="col-stage">
+                                @if($stage['label'])
+                                    <span class="badge-stage {{ $stage['badge'] }}" title="{{ $stage['counts'] }}">{{ $stage['label'] }}</span>
+                                @else
+                                    <span class="badge-stage secondary">—</span>
+                                @endif
+                            </td>
+                            <td class="col-update" title="{{ $updatedExact }}">
+                                <div class="ellipsis-wrapper">{{ $updatedHuman }}</div>
+                                <div class="small-muted ellipsis-wrapper">{{ $updatedExact }}</div>
+                            </td>
+                            <td class="col-catatan">
+                                <div class="ellipsis-wrapper small-muted" title="{{ $lastNote }}">
+                                    {{ Str::limit($lastNote, 80) }}
                                 </div>
                             </td>
-
-                            <td>
-                                <div class="small" title="{{ $updatedExact }}">{{ $updatedHuman }}</div>
-                                <div class="text-muted small">{{ $updatedExact }}</div>
-                            </td>
-                            <td class="text-end">
-                                <a class="btn btn-sm btn-outline-secondary round"
-                                   href="{{ route('progress.show', ['master' => $masterId]) }}">
-                                    <i class="bi bi-eye me-1"></i> Detail
-                                </a>
+                            <td class="col-aksi">
+                                <div class="dropdown">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary round" data-bs-toggle="dropdown" aria-expanded="false">
+                                        Aksi <i class="bi bi-chevron-down"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li><a class="dropdown-item" href="{{ route('progress.show', ['master' => $masterId]) }}"><i class="bi bi-eye me-2"></i>Detail Progress</a></li>
+                                        <li><a class="dropdown-item" href="{{ route('master.aktivitas.index', $masterId) }}"><i class="bi bi-clock-history me-2"></i>Lihat Aktivitas</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item" href="{{ route('master.edit', $masterId) }}"><i class="bi bi-pencil me-2"></i>Edit Sekolah</a></li>
+                                    </ul>
+                                </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6">
-                                <div class="text-center py-5">
-                                    <div class="mb-2">ðŸ“­</div>
-                                    <div class="fw-semibold">Belum ada penggunaan modul.</div>
-                                    <div class="text-muted small mb-3">Tambahkan penggunaan modul untuk mulai memantau progress sekolah.</div>
-                                    <a href="{{ route('penggunaan-modul.create') }}" class="btn btn-sm btn-primary round">
-                                        <i class="bi bi-plus-lg me-1"></i> Tambah Penggunaan
-                                    </a>
-                                </div>
+                            <td colspan="6" class="empty-state-cell">
+                                <div class="mb-2 fs-4">📑</div>
+                                <div class="fw-semibold">Belum ada data progress sekolah.</div>
+                                <div class="text-muted small">Data akan muncul di sini setelah sekolah menggunakan modul.</div>
                             </td>
                         </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
-    </div>
 
-    {{-- Pagination --}}
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
-        <div class="small text-muted">Menampilkan {{ $rows->firstItem() }} - {{ $rows->lastItem() }} dari {{ $rows->total() }} data</div>
-        <div>{{ $rows->appends(request()->query())->links() }}</div>
+        @if ($items->hasPages())
+        <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div class="small text-muted">Menampilkan {{ $items->firstItem() }} - {{ $items->lastItem() }} dari {{ $items->total() }} data</div>
+            <div>{{ $items->appends(request()->query())->links() }}</div>
+        </div>
+        @endif
     </div>
+</div>
 @endsection

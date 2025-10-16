@@ -8,78 +8,70 @@ use App\Models\AktivitasProspek;
 use App\Models\PenggunaanModul;
 use App\Models\Modul;
 use App\Models\BillingPaymentFile;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\StreamedResponse;
-use Carbon\Carbon;
 use Illuminate\Support\Str;
-use App\Models\MasterSekolah as MS;
-use App\Models\Notifikasi;
 
 class TagihanController extends Controller
 {
-    // helper dasar filter yang sama untuk laporan & csv
+    // =========================================================
+    // Helper query dasar (dipakai laporan & index)
+    // =========================================================
     private function baseTagihanQuery(Request $r)
     {
-        $q = \App\Models\TagihanKlien::query()
+        $q = TagihanKlien::query()
             ->with(['sekolah:id,nama_sekolah'])
-            ->whereNull('deleted_at'); // soft delete aman
+            ->whereNull('deleted_at');
 
         if ($r->filled('master_sekolah_id')) {
             $q->where('master_sekolah_id', $r->integer('master_sekolah_id'));
         }
 
         if ($r->filled('status')) {
-            // status: lunas / sebagian / draft
             $st = $r->status;
             if ($st === 'lunas') {
                 $q->whereColumn('terbayar', '>=', 'total')->where('total', '>', 0);
             } elseif ($st === 'sebagian') {
                 $q->whereColumn('terbayar', '<', 'total')->where('terbayar', '>', 0);
             } elseif ($st === 'draft') {
-                $q->where(function ($w) {
-                    $w->whereNull('total')->orWhere('total', '=', 0);
-                });
+                $q->where(function ($w) { $w->whereNull('total')->orWhere('total', '=', 0); });
             }
         }
 
-        // range tanggal
         if ($r->filled('date_from')) $q->whereDate('tanggal_tagihan', '>=', $r->date('date_from'));
-        if ($r->filled('date_to'))  $q->whereDate('tanggal_tagihan', '<=', $r->date('date_to'));
+        if ($r->filled('date_to'))   $q->whereDate('tanggal_tagihan', '<=', $r->date('date_to'));
 
-        // filter month (opsional)
         if ($r->filled('month')) {
             [$y,$m] = explode('-', $r->month);
             $q->whereYear('tanggal_tagihan', $y)->whereMonth('tanggal_tagihan', $m);
         }
 
-        // search
         if ($r->filled('q')) {
             $s = trim($r->q);
             $q->where(function ($w) use ($s) {
                 $w->where('nomor', 'like', "%$s%")
-                    ->orWhere('keterangan', 'like', "%$s%");
+                  ->orWhere('keterangan', 'like', "%$s%");
             });
         }
 
-        // due / overdue (laporan pakai due_only)
         if ($r->boolean('due_only')) {
             $q->whereColumn('terbayar', '<', 'total')
-                ->whereDate('jatuh_tempo', '<=', now()->toDateString());
+              ->whereDate('jatuh_tempo', '<=', now()->toDateString());
         }
 
         return $q;
     }
 
+    // =========================================================
+    // Laporan + export
+    // =========================================================
     public function laporan(Request $r)
     {
         $base = $this->baseTagihanQuery($r);
 
-        // === RINGKASAN (TANPA orderBy!) ===
         $sum = (clone $base)
-            ->selectRaw('COALESCE(SUM(total),0)      AS total')
-            ->selectRaw('COALESCE(SUM(terbayar),0)       AS terbayar')
+            ->selectRaw('COALESCE(SUM(total),0) AS total')
+            ->selectRaw('COALESCE(SUM(terbayar),0) AS terbayar')
             ->selectRaw('COALESCE(SUM(GREATEST(total - terbayar,0)),0) AS sisa')
             ->selectRaw("SUM(CASE WHEN jatuh_tempo IS NOT NULL AND terbayar < total AND jatuh_tempo < CURRENT_DATE THEN 1 ELSE 0 END) AS overdue_count")
             ->first();
@@ -92,14 +84,12 @@ class TagihanController extends Controller
             'collection_rate' => $sum->total > 0 ? round(($sum->terbayar / $sum->total) * 100, 1) : 0,
         ];
 
-        // === LIST ITEM (boleh pakai orderBy) ===
         $items = (clone $base)
             ->orderByDesc('tanggal_tagihan')
             ->orderByDesc('id')
             ->paginate((int) $r->get('per', 25));
 
-        // daftar klien buat dropdown
-        $klien = \App\Models\MasterSekolah::orderBy('nama_sekolah')->get(['id','nama_sekolah']);
+        $klien = MasterSekolah::orderBy('nama_sekolah')->get(['id','nama_sekolah']);
 
         return view('tagihan.laporan', compact('items','summary','klien'));
     }
@@ -107,12 +97,7 @@ class TagihanController extends Controller
     public function laporanExportCsv(Request $r)
     {
         $base = $this->baseTagihanQuery($r);
-
-        // rows untuk CSV (boleh orderBy)
-        $rows = (clone $base)
-            ->orderByDesc('tanggal_tagihan')
-            ->orderByDesc('id')
-            ->get();
+        $rows = (clone $base)->orderByDesc('tanggal_tagihan')->orderByDesc('id')->get();
 
         return \Response::streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
@@ -120,7 +105,7 @@ class TagihanController extends Controller
             foreach ($rows as $t) {
                 $sisa = max((int)$t->total - (int)$t->terbayar, 0);
                 $status = ($t->total > 0 && $t->terbayar >= $t->total) ? 'lunas'
-                                 : (($t->terbayar > 0) ? 'sebagian' : 'draft');
+                                : (($t->terbayar > 0) ? 'sebagian' : 'draft');
 
                 fputcsv($out, [
                     optional($t->sekolah)->nama_sekolah,
@@ -139,24 +124,12 @@ class TagihanController extends Controller
         ]);
     }
 
-    /**
-     * Helper: ambil harga per siswa dari object Modul dengan fallback beragam kolom.
-     */
-    private function unitPrice(Modul $m): int
-    {
-        // urutkan prioritas harga_default dulu
-        $candidates = ['harga_default','harga_per_siswa','harga','biaya','price','tarif'];
-        foreach ($candidates as $c) {
-            if (isset($m->{$c}) && is_numeric($m->{$c})) {
-                return (int) $m->{$c};
-            }
-        }
-        return 0;
-    }
-
+    // =========================================================
+    // Index
+    // =========================================================
     public function index(Request $r)
     {
-        $q = TagihanKlien::query()->with(['sekolah']);
+        $q = TagihanKlien::query()->with(['sekolah:id,nama_sekolah', 'modul:id,nama']);
 
         if ($r->filled('master_sekolah_id')) $q->where('master_sekolah_id', $r->integer('master_sekolah_id'));
         if ($r->filled('status')) $q->where('status', $r->string('status'));
@@ -166,34 +139,31 @@ class TagihanController extends Controller
             $s = trim($r->q);
             $q->where(function ($x) use ($s) {
                 $x->where('nomor', 'like', "%{$s}%")
-                    ->orWhere('catatan', 'like', "%{$s}%");
+                  ->orWhere('catatan', 'like', "%{$s}%");
             });
         }
 
-        // siapkan sekali
         $today = now()->toDateString();
-
         $onlyOverdue = $r->boolean('only_overdue');
-        $onlyDue     = $r->boolean('only_due') && ! $onlyOverdue; // prioritas overdue
+        $onlyDue     = $r->boolean('only_due') && ! $onlyOverdue;
 
         if ($onlyDue) {
             $q->whereColumn('terbayar', '<', 'total')
-                ->whereDate('jatuh_tempo', $today);
+              ->whereDate('jatuh_tempo', $today);
         }
 
         if ($onlyOverdue) {
             $q->whereColumn('terbayar', '<', 'total')
-                ->whereDate('jatuh_tempo', '<', $today);
+              ->whereDate('jatuh_tempo', '<', $today);
         }
 
-        $items = (clone $q)->orderByDesc('tanggal_tagihan')->paginate(20)->withQueryString();
+        $items = (clone $q)->orderByDesc('tanggal_tagihan')->paginate((int)$r->get('per', 20))->withQueryString();
 
         $sum = (clone $q)->selectRaw('COALESCE(SUM(total),0) AS total, COALESCE(SUM(terbayar),0) AS terbayar')->first();
         $total     = (int) ($sum->total ?? 0);
         $terbayar  = (int) ($sum->terbayar ?? 0);
         $sisa      = $total - $terbayar;
 
-        $today     = now()->toDateString();
         $due       = (clone $q)->whereColumn('terbayar', '<', 'total')->whereDate('jatuh_tempo', $today)->count();
         $overdue   = (clone $q)->whereColumn('terbayar', '<', 'total')->whereDate('jatuh_tempo', '<', $today)->count();
         $cr        = $total > 0 ? round(($terbayar / $total) * 100) : 0;
@@ -206,188 +176,88 @@ class TagihanController extends Controller
         return view('tagihan.index', compact('items', 'sekolah', 'summary', 'f'));
     }
 
-    // --- bagian controller lainnya yang tidak diubah ---
-
+    // =========================================================
+    // Create
+    // =========================================================
     public function create(Request $r)
     {
         $prefillId = $r->integer('master_sekolah_id') ?: null;
-        $sekolah   = MasterSekolah::orderBy('nama_sekolah')->get(['id','nama_sekolah','jumlah_siswa']);
 
-        // ambil modul yang sedang dipakai oleh sekolah (jika sudah pilih sekolah)
+        $sekolah = MasterSekolah::orderBy('nama_sekolah')->get(['id','nama_sekolah','jumlah_siswa']);
+
+        // modul yang terpasang (untuk pre-check di checklist)
         $assigned = collect();
-        $defaultSiswa = null;
-
         if ($prefillId) {
-            $defaultSiswa = optional(MasterSekolah::find($prefillId))->jumlah_siswa;
-            $assigned = PenggunaanModul::with('modul')
-                ->where('master_sekolah_id', $prefillId)
-                ->get()
-                ->pluck('modul')
-                ->filter()
-                ->map(fn($m)=>[
-                    'id'   => $m->id,
-                    'nama' => $m->nama,
-                ])->values();
+            $assigned = PenggunaanModul::where('master_sekolah_id', $prefillId)->pluck('modul_id');
         }
 
-        return view('tagihan.create', compact('sekolah','prefillId','assigned','defaultSiswa'));
+        // semua modul aktif untuk checklist
+        $allModul = Modul::aktif()->orderBy('nama')->get(['id','nama']);
+
+        return view('tagihan.create', compact('sekolah','prefillId','allModul','assigned'));
     }
 
-    /**
-     * Endpoint preview perhitungan harga modul × jumlah siswa (JSON).
-     * GET /tagihan/hitung?master_sekolah_id=..&siswa=..&modul_ids[]=1&modul_ids[]=2
-     */
-    public function hitung(Request $r)
-    {
-        $data = $r->validate([
-            'master_sekolah_id'  => ['required','integer','exists:master_sekolah,id'],
-            'siswa'              => ['nullable','integer','min:0'],
-            'modul_ids'          => ['nullable','array'],
-            'modul_ids.*'        => ['integer','exists:modul,id'],
-        ]);
-
-        $siswa = $data['siswa'] ?? optional(MasterSekolah::find($data['master_sekolah_id']))->jumlah_siswa ?? 0;
-
-        // jika modul_ids kosong -> pakai modul yang terpasang pada sekolah
-        $modulIds = $r->filled('modul_ids')
-            ? array_values(array_unique($data['modul_ids']))
-            : PenggunaanModul::where('master_sekolah_id', $data['master_sekolah_id'])->pluck('modul_id')->all();
-
-        $modules = Modul::whereIn('id', $modulIds)->get();
-
-        $rows = [];
-        $total = 0;
-
-        foreach ($modules as $m) {
-            $u = $this->unitPrice($m); // harga per siswa
-            $sub = $u * $siswa;
-            $rows[] = [
-                'id'       => $m->id,
-                'nama'     => $m->nama,
-                'harga'    => $u,
-                'siswa'    => $siswa,
-                'subtotal' => $sub,
-            ];
-            $total += $sub;
-        }
-
-        return response()->json([
-            'ok'    => true,
-            'siswa' => (int) $siswa,
-            'items' => $rows,
-            'total' => (int) $total,
-        ]);
-    }
-
-    /**
-     * Endpoint untuk mengambil modul terpasang per sekolah (JSON)
-     */
-    public function assignedModules(Request $r)
-    {
-        $data = $r->validate([
-            'master_sekolah_id' => ['required','integer','exists:master_sekolah,id'],
-        ]);
-
-        $rows = \App\Models\PenggunaanModul::with(['modul:id,nama,harga_default'])
-            ->where('master_sekolah_id', (int) $data['master_sekolah_id'])
-            ->get()
-            ->map(function ($pm) {
-                if (!$pm->modul) return null;
-                $m = $pm->modul;
-                return [
-                    'id'    => $m->id,
-                    'nama'  => $m->nama,
-                    'harga' => $this->unitPrice($m), // tetap pakai helper di controller ini
-                ];
-            })
-            ->filter()
-            ->values();
-
-        return response()->json(['ok' => true, 'items' => $rows]);
-    }
-
-
-    // Tambah di dalam class TagihanController
     private function makeNomor(int $schoolId): string
     {
-        // Format: INV-YYYYMMDD-SID-XXX
         $prefix = 'INV-'.now()->format('Ymd').'-'.$schoolId.'-';
-        $last = \App\Models\TagihanKlien::where('nomor', 'like', $prefix.'%')
+        $last = TagihanKlien::where('nomor', 'like', $prefix.'%')
             ->orderByDesc('nomor')->value('nomor');
 
         $seq = 1;
-        if ($last && preg_match('/-(\d+)$/', $last, $m)) {
-            $seq = ((int)$m[1]) + 1;
-        }
+        if ($last && preg_match('/-(\d+)$/', $last, $m)) $seq = ((int)$m[1]) + 1;
         return $prefix.str_pad((string)$seq, 3, '0', STR_PAD_LEFT);
     }
 
+    // =========================================================
+    // Store
+    // =========================================================
     public function store(Request $r)
     {
-        // Validasi (jatuh_tempo sekarang WAJIB)
         $data = $r->validate([
             'master_sekolah_id' => ['required','integer','exists:master_sekolah,id'],
             'tanggal_tagihan'   => ['nullable','date'],
-            'catatan'           => ['nullable','string'],
-            'terbayar'          => ['nullable','numeric','min:0'],
-            'buat_lagi'         => ['nullable','boolean'],
-            'hitung_otomatis'   => ['nullable','boolean'],
-            'siswa_count'       => ['nullable','integer','min:0'],
-            'modul_ids'         => ['nullable','array'],
-            'modul_ids.*'       => ['integer','exists:modul,id'],
-            'total'             => ['nullable','integer','min:0'],
-            'status'            => ['nullable','in:draft,sebagian,terkirim,lunas'],
-            // WAJIB + pesan ramah
             'jatuh_tempo'       => ['required','date','after_or_equal:tanggal_tagihan'],
             'nomor'             => ['nullable','string','max:64'],
+            'total'             => ['required','integer','min:0'],
+            'terbayar'          => ['nullable','integer','min:0'],
+            'status'            => ['nullable','in:draft,sebagian,terkirim,lunas'],
+            'modul_ids'         => ['nullable','array'],
+            'modul_ids.*'       => ['integer','exists:modul,id'],
+            'pivot_ket'         => ['nullable','array'],
         ], [
-            'jatuh_tempo.required'      => 'Jatuh tempo wajib diisi.',
-            'jatuh_tempo.after_or_equal'=> 'Jatuh tempo tidak boleh sebelum tanggal tagihan.',
+            'jatuh_tempo.required' => 'Jatuh tempo wajib diisi.',
+            'jatuh_tempo.after_or_equal' => 'Jatuh tempo tidak boleh sebelum tanggal tagihan.',
         ]);
 
-        // Gate non-admin (tetap)
-        $isAdmin = method_exists($r->user(), 'hasAnyRole') && $r->user()->hasAnyRole(['admin','superadmin']);
-        if (!$isAdmin) {
-            $sekolah = MS::findOrFail($data['master_sekolah_id']);
-            if ((int)$sekolah->stage < MS::ST_MOU) {
-                return back()->withErrors(['master_sekolah_id' => 'Stage sekolah belum MOU/KLIEN.'])->withInput();
-            }
-        }
-
-        // Hitung total (tetap)
-        if ($r->boolean('hitung_otomatis')) {
-            $siswa = $data['siswa_count'] ?? optional(MasterSekolah::find($data['master_sekolah_id']))->jumlah_siswa ?? 0;
-            $modulIds = $r->filled('modul_ids')
-                ? array_values(array_unique($data['modul_ids']))
-                : PenggunaanModul::where('master_sekolah_id', $data['master_sekolah_id'])->pluck('modul_id')->all();
-            $modules = Modul::whereIn('id', $modulIds)->get();
-            $total = 0;
-            foreach ($modules as $m) $total += $this->unitPrice($m) * (int)$siswa;
-        } else {
-            if ($r->input('total') === null || $r->input('total') === '') {
-                return back()->withErrors(['total' => 'Total tagihan wajib diisi.'])->withInput();
-            }
-            $total = (int) $r->input('total');
-        }
-
-        // --- Pastikan NOMOR SELALU ADA
-        $nomor = trim((string) $r->input('nomor', ''));
+        $nomor = trim((string)($data['nomor'] ?? ''));
         if ($nomor === '') {
             $nomor = $this->makeNomor((int)$data['master_sekolah_id']);
         }
 
         $payload = [
             'master_sekolah_id' => (int)$data['master_sekolah_id'],
-            'nomor'             => $nomor,              // <-- pasti terisi
+            'nomor'             => $nomor,
             'tanggal_tagihan'   => $r->input('tanggal_tagihan') ?: now()->toDateString(),
-            'jatuh_tempo'       => $r->input('jatuh_tempo'),           // <-- sudah required
-            'total'             => $total,
+            'jatuh_tempo'       => $data['jatuh_tempo'],
+            'total'             => (int)$data['total'],
             'terbayar'          => (int)$r->input('terbayar', 0),
             'status'            => $r->input('status','draft'),
             'catatan'           => $r->input('catatan'),
         ];
 
-        $t = TagihanKlien::create($payload);
+        DB::transaction(function () use ($payload, $r, &$t) {
+            $t = TagihanKlien::create($payload);
+
+            // simpan modul pivot (metadata)
+            $sync = [];
+            $ket  = $r->input('pivot_ket', []);
+            foreach ((array) $r->input('modul_ids', []) as $mid) {
+                $sync[(int)$mid] = ['keterangan' => $ket[$mid] ?? null];
+            }
+            if (!empty($sync)) {
+                $t->modul()->sync($sync);
+            }
+        });
 
         AktivitasProspek::create([
             'master_sekolah_id' => $t->master_sekolah_id,
@@ -407,16 +277,19 @@ class TagihanController extends Controller
         return redirect()->route('tagihan.index')->with('ok', 'Tagihan berhasil dibuat.');
     }
 
+    // =========================================================
+    // Show / Edit / Update / Delete
+    // =========================================================
     public function show(TagihanKlien $tagihan)
     {
-        $tagihan->load('sekolah', 'notifikasi');
+        $tagihan->load(['sekolah', 'notifikasi', 'modul']);
         return view('tagihan.show', compact('tagihan'));
     }
 
     public function edit(TagihanKlien $tagihan)
     {
         return view('tagihan.edit', [
-            'tagihan' => $tagihan->load('sekolah'),
+            'tagihan' => $tagihan->load('sekolah', 'modul'),
             'sekolah' => MasterSekolah::orderBy('nama_sekolah')->get(['id', 'nama_sekolah']),
         ]);
     }
@@ -428,7 +301,7 @@ class TagihanController extends Controller
             'tanggal_tagihan'   => ['nullable','date'],
             'catatan'           => ['nullable','string'],
             'terbayar'          => ['nullable','numeric','min:0'],
-            'jatuh_tempo'       => ['required','date','after_or_equal:tanggal_tagihan'], // <-- tambah required
+            'jatuh_tempo'       => ['required','date','after_or_equal:tanggal_tagihan'],
         ], [
             'jatuh_tempo.required' => 'Jatuh tempo wajib diisi.',
             'jatuh_tempo.after_or_equal' => 'Jatuh tempo tidak boleh sebelum tanggal tagihan.',
@@ -440,7 +313,7 @@ class TagihanController extends Controller
         }
 
         $status = $r->input('status', $tagihan->status);
-        $nomor = $r->input('nomor', $tagihan->nomor);
+        $nomor  = $r->input('nomor', $tagihan->nomor);
 
         $payload = [
             'master_sekolah_id' => (int)$data['master_sekolah_id'],
@@ -468,7 +341,9 @@ class TagihanController extends Controller
         return back()->with('ok', 'Tagihan berhasil dihapus.');
     }
 
-    // --- Pembayaran parsial/lunas ---
+    // =========================================================
+    // Pembayaran
+    // =========================================================
     public function bayarForm(TagihanKlien $tagihan)
     {
         return view('tagihan.bayar', compact('tagihan'));
@@ -487,7 +362,7 @@ class TagihanController extends Controller
         DB::beginTransaction();
 
         try {
-           $terbayarBaru = min((int)$tagihan->total, (int)$tagihan->terbayar + (int)$data['nominal']);
+            $terbayarBaru = min((int)$tagihan->total, (int)$tagihan->terbayar + (int)$data['nominal']);
 
             $tagihan->update([
                 'terbayar'   => $terbayarBaru,
@@ -522,7 +397,6 @@ class TagihanController extends Controller
             DB::commit();
 
             return redirect()->route('tagihan.show', $tagihan)->with('ok', 'Pembayaran berhasil dicatat. Status tagihan diperbarui.');
-
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('err', 'Terjadi kesalahan saat mencatat pembayaran: ' . $e->getMessage())->withInput();
@@ -531,13 +405,9 @@ class TagihanController extends Controller
 
     private function determineStatus(int $total, int $terbayar): string
     {
-        if ($terbayar <= 0) {
-            return 'draft';
-        } elseif ($terbayar < $total) {
-            return 'sebagian';
-        } else {
-            return 'lunas';
-        }
+        if ($terbayar <= 0) return 'draft';
+        if ($terbayar < $total) return 'sebagian';
+        return 'lunas';
     }
 
     private function refreshStatus(TagihanKlien $t): void
@@ -546,6 +416,9 @@ class TagihanController extends Controller
         $t->save();
     }
 
+    // =========================================================
+    // WhatsApp & Notifikasi
+    // =========================================================
     public function wa(TagihanKlien $tagihan)
     {
         if (method_exists($this, 'authorize')) {
@@ -563,18 +436,11 @@ class TagihanController extends Controller
             ?? $sekolah->telp
             ?? null;
 
-        if (! $raw) {
-            return back()->with('err', 'Nomor WhatsApp tidak tersedia untuk sekolah ini.');
-        }
+        if (!$raw) return back()->with('err', 'Nomor WhatsApp tidak tersedia untuk sekolah ini.');
 
         $phone = preg_replace('/\D+/', '', $raw ?? '');
-
-        if (Str::startsWith($phone, '620')) {
-            $phone = '62' . substr($phone, 3);
-        }
-        if (Str::startsWith($phone, '0')) {
-            $phone = '62' . substr($phone, 1);
-        }
+        if (Str::startsWith($phone, '620')) $phone = '62' . substr($phone, 3);
+        if (Str::startsWith($phone, '0'))   $phone = '62' . substr($phone, 1);
         if ($phone === '' || ! Str::startsWith($phone, '62')) {
             return back()->with('err', 'Nomor WA tidak valid. Gunakan format Indonesia (08xx / +62).');
         }
@@ -618,15 +484,13 @@ class TagihanController extends Controller
 
     public function notifikasiJatuhTempo(Request $r)
     {
-        // Panggil method yang sama dengan hari = 0
         $r->merge(['hari' => 0]);
         return $this->notifikasiHMinus30($r);
     }
 
     public function notifikasi(Request $r, TagihanKlien $tagihan)
     {
-        $items = TagihanKlien::with('sekolah')
-            ->where('id', $tagihan->id)->get();
+        $items = TagihanKlien::with('sekolah')->where('id', $tagihan->id)->get();
 
         return view('tagihan.notif', [
             'items'   => $items,
@@ -643,7 +507,7 @@ class TagihanController extends Controller
             'isi_pesan' => 'nullable|string',
         ]);
 
-        Notifikasi::create([
+        \App\Models\Notifikasi::create([
             'tagihan_id' => $tagihan->id,
             'saluran'    => $data['saluran'],
             'isi_pesan'  => $data['isi_pesan'] ?? null,

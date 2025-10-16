@@ -12,7 +12,7 @@ class MasterSekolahController extends Controller
     {
         $q = MasterSekolah::query();
 
-        // status yang dianggap selesai
+        // status yang dianggap selesai untuk progress modul
         $doneStates = ['done','selesai','complete','completed','ended'];
 
         // total modul & modul selesai
@@ -26,15 +26,27 @@ class MasterSekolahController extends Controller
             },
         ]);
 
-        // Alias: status => stage
+        // === Alias: status (lama) => stage (baru) ===
+        // Mendukung nilai lama maupun baru untuk backward-compat.
         if ($request->filled('status')) {
+            $status = strtolower(trim($request->status));
             $map = [
+                // Lama
                 'calon'   => MasterSekolah::ST_CALON,
-                'prospek' => MasterSekolah::ST_PROSPEK,
-                'klien'   => MasterSekolah::ST_KLIEN,
+                'prospek' => MasterSekolah::ST_SHB,     // anggap "prospek" = sudah dihubungi
+                'negosiasi' => MasterSekolah::ST_SLTH,  // jika ada yang memakai
+                'mou'     => MasterSekolah::ST_MOU,
+                'klien'   => MasterSekolah::ST_TLMOU,   // "klien" lama ~ tindak lanjut MOU
+                'ditolak' => MasterSekolah::ST_TOLAK,
+
+                // Baru (slug)
+                'sudah_dihubungi'   => MasterSekolah::ST_SHB,
+                'sudah_dilatih'     => MasterSekolah::ST_SLTH,
+                'mou_aktif'         => MasterSekolah::ST_MOU,
+                'tindak_lanjut_mou' => MasterSekolah::ST_TLMOU,
             ];
-            if (isset($map[$request->status])) {
-                $q->where('stage', $map[$request->status]);
+            if (isset($map[$status])) {
+                $q->where('stage', $map[$status]);
             }
         }
 
@@ -43,12 +55,12 @@ class MasterSekolahController extends Controller
             $q->where('stage', (int) $request->integer('stage'));
         }
 
-        // Filter MOU & TTD (biarkan seperti sebelumnya jika memang ada scope hasMou/hasTtd)
+        // Filter MOU & TTD (pakai scope yang sudah ada di model)
         if ($request->filled('mou')) {
-            $q->{$request->mou === 'yes' ? 'hasMou' : 'hasMou'}($request->mou === 'yes');
+            $q->hasMou($request->mou === 'yes');
         }
         if ($request->filled('ttd')) {
-            $q->{$request->ttd === 'yes' ? 'hasTtd' : 'hasTtd'}($request->ttd === 'yes');
+            $q->hasTtd($request->ttd === 'yes');
         }
 
         // Pencarian teks
@@ -69,12 +81,14 @@ class MasterSekolahController extends Controller
                   ->paginate((int) $request->input('per_page', 15))
                   ->withQueryString();
 
+        // Opsi stage (baru)
         $stageOptions = [
-            MasterSekolah::ST_CALON      => 'Calon',
-            MasterSekolah::ST_PROSPEK    => 'Prospek',
-            MasterSekolah::ST_NEGOSIASI  => 'Negosiasi',
-            MasterSekolah::ST_MOU        => 'MOU',
-            MasterSekolah::ST_KLIEN      => 'Klien',
+            MasterSekolah::ST_CALON  => 'Calon',
+            MasterSekolah::ST_SHB    => 'sudah dihubungi',
+            MasterSekolah::ST_SLTH   => 'sudah dilatih',
+            MasterSekolah::ST_MOU    => 'MOU Aktif',
+            MasterSekolah::ST_TLMOU  => 'Tindak lanjut MOU',
+            MasterSekolah::ST_TOLAK  => 'Ditolak',
         ];
 
         $filters = [
@@ -103,18 +117,32 @@ class MasterSekolahController extends Controller
             'catatan'        => 'nullable|string',
             'jenjang'        => 'nullable|string|max:50',
             'narahubung'     => 'nullable|string|max:100',
-            'status_klien'   => 'nullable|in:calon,prospek,klien',
+            // status_klien lama tetap dibiarkan untuk kompatibilitas
+            'status_klien'   => 'nullable|string|max:50',
             'tindak_lanjut'  => 'nullable|string',
             'jumlah_siswa'   => 'nullable|integer|min:0',
         ]);
 
+        // Default status_klien lama → "calon" jika kosong
         $payload['status_klien'] = $payload['status_klien'] ?? 'calon';
+
+        // Pemetaan lama & baru ke stage baru
+        $status = strtolower((string) $payload['status_klien']);
         $stageMap = [
-            'calon'   => MasterSekolah::ST_CALON,
-            'prospek' => MasterSekolah::ST_PROSPEK,
-            'klien'   => MasterSekolah::ST_KLIEN,
+            // Lama
+            'calon'     => MasterSekolah::ST_CALON,
+            'prospek'   => MasterSekolah::ST_SHB,
+            'negosiasi' => MasterSekolah::ST_SLTH,
+            'mou'       => MasterSekolah::ST_MOU,
+            'klien'     => MasterSekolah::ST_TLMOU,
+            'ditolak'   => MasterSekolah::ST_TOLAK,
+            // Baru (kalau nanti field ini ikut diisi)
+            'sudah_dihubungi'   => MasterSekolah::ST_SHB,
+            'sudah_dilatih'     => MasterSekolah::ST_SLTH,
+            'mou_aktif'         => MasterSekolah::ST_MOU,
+            'tindak_lanjut_mou' => MasterSekolah::ST_TLMOU,
         ];
-        $payload['stage'] = $stageMap[$payload['status_klien']] ?? MasterSekolah::ST_CALON;
+        $payload['stage'] = $stageMap[$status] ?? MasterSekolah::ST_CALON;
 
         $row = MasterSekolah::create($payload);
 
@@ -156,7 +184,7 @@ class MasterSekolahController extends Controller
     public function updateStage(Request $request, MasterSekolah $master)
     {
         $validated = $request->validate([
-            'to'   => 'required|integer|in:1,2,3,4,5',
+            'to'   => 'required|integer|in:1,2,3,4,5,6',
             'note' => 'nullable|string',
         ]);
 
@@ -169,17 +197,18 @@ class MasterSekolahController extends Controller
         return back()->with('ok', 'Tahapan berhasil diperbarui.');
     }
 
+    // Tetap disediakan untuk kompatibilitas lama (boleh dihapus bila tidak dipakai)
     public function jadikanKlien(Request $r, MasterSekolah $sekolah)
     {
         $beforeStage = $sekolah->getOriginal('stage');
 
-        $sekolah->stage = MasterSekolah::ST_KLIEN;
+        $sekolah->stage = MasterSekolah::ST_TLMOU; // pada skema baru, "klien" ≈ tindak lanjut MOU
         $sekolah->tanggal_menjadi_klien = now();
         $sekolah->save();
 
-        $sekolah->logCustom('prospek.to_klien', ['stage_to' => MasterSekolah::ST_KLIEN], ['stage_from' => $beforeStage]);
+        $sekolah->logCustom('prospek.to_klien', ['stage_to' => MasterSekolah::ST_TLMOU], ['stage_from' => $beforeStage]);
 
-        return back()->with('ok', 'Sekolah dijadikan klien.');
+        return back()->with('ok', 'Sekolah dipindahkan ke tindak lanjut MOU.');
     }
 
     public function destroy(MasterSekolah $master)

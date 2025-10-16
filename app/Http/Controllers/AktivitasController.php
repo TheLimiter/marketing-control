@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Modul;
 use App\Models\MasterSekolah;
 use App\Models\AktivitasProspek;
 use App\Models\AktivitasFile;
@@ -62,7 +63,8 @@ class AktivitasController extends Controller
     {
         $q = AktivitasProspek::query()
             ->with([
-                'master:id,nama_sekolah,stage',
+                // PERBAIKAN: Hapus 'kota_kab' dan pastikan 'mou_path' & 'ttd_status' ada.
+                'master:id,nama_sekolah,stage,mou_path,ttd_status',
                 'creator:id,name',
                 'files:id,aktivitas_id,original_name,size,mime,path',
                 'paymentFiles:id,aktivitas_id,original_name,size,mime,path',
@@ -162,11 +164,15 @@ class AktivitasController extends Controller
         $items = $q->paginate($per)->withQueryString();
 
         $stageOptions = [
-            MS::ST_CALON      => 'Calon',
-            MS::ST_PROSPEK    => 'Prospek',
-            MS::ST_NEGOSIASI  => 'Negosiasi',
-            MS::ST_MOU        => 'MOU',
-            MS::ST_KLIEN      => 'Klien',
+            $stageOptions = [
+             MS::ST_CALON   => 'Calon',
+             MS::ST_SHB     => 'sudah dihubungi',
+             MS::ST_SLTH    => 'sudah dilatih',
+             MS::ST_MOU     => 'MOU Aktif',
+             MS::ST_TLMOU   => 'Tindak lanjut MOU',
+             MS::ST_TOLAK   => 'Ditolak',
+        ]
+
         ];
 
         $distinctJenis = AktivitasProspek::query()
@@ -304,9 +310,9 @@ class AktivitasController extends Controller
         $invoiceSummary = TagihanKlien::selectRaw("
             SUM(CASE WHEN COALESCE(terbayar,0) < COALESCE(total,0) THEN 1 ELSE 0 END) AS unpaid_count,
             SUM(CASE WHEN COALESCE(terbayar,0) < COALESCE(total,0)
-                      THEN (COALESCE(total,0) - COALESCE(terbayar,0)) ELSE 0 END)      AS unpaid_sum,
+                     THEN (COALESCE(total,0) - COALESCE(terbayar,0)) ELSE 0 END)       AS unpaid_sum,
             SUM(CASE WHEN COALESCE(terbayar,0) >= COALESCE(total,0) AND COALESCE(total,0) > 0
-                      THEN 1 ELSE 0 END)                                                 AS paid_count
+                     THEN 1 ELSE 0 END)                                                AS paid_count
         ")
         ->where('master_sekolah_id', $master->id)
         ->first();
@@ -326,25 +332,31 @@ class AktivitasController extends Controller
     public function store(Request $request, MasterSekolah $master)
     {
         $payload = $request->validate([
-            'jenis'   => ['required', 'string', 'max:100'],
-            'hasil'   => ['required', 'string', 'max:150'],
-            'catatan' => ['nullable', 'string'],
-            'files.*' => ['file', 'max:5120', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx,ppt,pptx'],
+            'jenis'   => ['required','string','max:100'],   // dari hidden input = modul_progress
+            'hasil'   => ['required','string','max:150'],
+            'catatan' => ['nullable','string'],
+            'modul_id'=> ['nullable','integer','exists:modul,id'],
+            'files.*' => ['file','max:5120','mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx,ppt,pptx'],
         ]);
 
+        // Prefix hasil dengan nama modul (opsional)
+        if (!empty($payload['modul_id'])) {
+            if ($m = Modul::find($payload['modul_id'])) {
+                $payload['hasil'] = '['.$m->nama.'] '.$payload['hasil'];
+            }
+            unset($payload['modul_id']);
+        }
+
         $payload['master_sekolah_id'] = $master->id;
-        $payload['created_by'] = auth()->id();
-        $payload['tanggal'] = now();
+        $payload['created_by']        = auth()->id();
+        $payload['tanggal']           = now();
 
         $aktivitas = AktivitasProspek::create($payload);
 
-        // Simpan lampiran kalau ada
         if ($request->hasFile('files')) {
             foreach ($request->file('files') as $f) {
-                if (!$f->isValid()) {
-                    continue;
-                }
-                $path = $f->store('aktivitas', 'public');
+                if (!$f->isValid()) continue;
+                $path = $f->store('aktivitas','public');
                 $aktivitas->files()->create([
                     'path' => $path,
                     'original_name' => $f->getClientOriginalName(),
@@ -354,7 +366,7 @@ class AktivitasController extends Controller
             }
         }
 
-        return back()->with('ok', 'Aktivitas berhasil ditambahkan.');
+        return back()->with('ok','Aktivitas berhasil ditambahkan.');
     }
 
     public function destroy(MasterSekolah $master, AktivitasProspek $aktivitas)

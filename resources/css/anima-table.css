@@ -1,64 +1,148 @@
+/* =========================================================
+   Anima Table – Flexible Grid Table
+   - Fokus: jarak antar kolom (horizontal spacing) & responsive
+   - Ubah nilai di :root untuk menyesuaikan
+   ========================================================= */
+
 :root{
+  /* Palette & fonts */
   --neutralblack-1:#131315;
   --neutralgrey-6:#878AA6;
   --neutralgrey-14:#EFF0F9;
   --neutralgrey-13:#E5E7F2;
   --neutralgrey-9:#C3C2D7;
   --neutralwhite:#fff;
+
   --heading-h5:700 15px/20px Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
   --heading-h5-reg:400 15px/20px Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
   --heading-h6:700 13px/16px Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
   --para-sm:400 13px/20px Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+
+  /* Grid & spacing (UBAH YG INI SAJA KALAU PERLU) */
+  --col-check: 52px;
+  --col-name: clamp(200px, 28ch, 360px); /* elastis mengikuti judul/isi */
+  --col-nis:  clamp(112px, 12ch, 160px);
+  --col-ket:  1fr;
+
+  --row-pad-y: 12px;     /* padding vertikal per baris */
+  --row-pad-x: 16px;     /* padding horizontal per baris (baru) */
+  --row-gap:   10px;     /* jarak antar baris */
+  --cell-gap:  20px;     /* JARAK ANTAR KOLOM (gutter). default 20px */
+  --radius:    10px;
 }
 
-/* SCOPING: semua style dalam .anima-scope biar aman */
-.anima-scope * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+/* ==== Scoping biar aman ==== */
+.anima-scope * { box-sizing:border-box; -webkit-font-smoothing:antialiased; }
 
+/* ==== Panel (opsional) di atas table ==== */
 .anima-panel{
   display:flex; align-items:center; width:100%;
   background:var(--neutralwhite);
   border:2px solid var(--neutralgrey-13); border-bottom:none;
   padding:0;
 }
-.anima-panel .check{width:52px; display:flex; justify-content:center; padding:14px 0;}
-.anima-panel .title{flex:1; padding:14px 0; font:var(--heading-h5); color:#131315;}
-.anima-panel .dropdown{display:inline-flex; align-items:center; gap:12px; padding:14px 16px; font:var(--heading-h5-reg);}
+.anima-panel .check{ width:var(--col-check); display:flex; justify-content:center; padding:14px 0; }
+.anima-panel .title{ flex:1; padding:14px 0; font:var(--heading-h5); color:var(--neutralblack-1); }
+.anima-panel .dropdown{ display:inline-flex; align-items:center; gap:12px; padding:14px 16px; font:var(--heading-h5-reg); }
 
+/* ==== Table wrapper ==== */
 .anima-table{
   width:100%;
+  background:var(--neutralgrey-14);
   border:2px solid var(--neutralgrey-13);
   border-top:none;
+  padding:8px;
+  border-radius:var(--radius);
   overflow:hidden;
 }
-.anima-head,.anima-row{
-  display:flex; align-items:center; width:100%;
+
+/* Head & Row pakai grid agar kolom sinkron */
+.anima-head,
+.anima-row{
+  display:grid;
+  grid-template-columns: var(--col-check) var(--col-name) var(--col-nis) var(--col-ket);
+  align-items:center;
+  column-gap: var(--cell-gap); /* gutter horizontal */
+  width:100%;
 }
+
+/* ==== Head ==== */
 .anima-head{
-  background:var(--neutralgrey-14);
-  border-bottom:2px solid var(--neutralgrey-13);
+  background:var(--neutralwhite);
+  border:2px solid var(--neutralgrey-13);
+  border-radius:var(--radius);
+  padding:10px var(--row-pad-x);
+  margin-bottom: var(--row-gap);
 }
+.anima-head .label{ font:var(--heading-h6); color:var(--neutralblack-1); }
+.anima-table{ position:relative; }
+.anima-head{ position:sticky; top:0; z-index:5; }
+
+
+/* ==== Row ==== */
 .anima-row{
   background:var(--neutralwhite);
-  border-bottom:2px solid var(--neutralgrey-13);
+  border:1.5px solid var(--neutralgrey-13);
+  border-radius:var(--radius);
+  padding: var(--row-pad-y) var(--row-pad-x);
+  margin-bottom: var(--row-gap);
+  transition: box-shadow .15s ease, border-color .15s ease, transform .05s ease;
 }
-.anima-col{ padding:6px 8px; }
-.col-check{ width:52px; display:flex; justify-content:center; }
-.col-name{ width:242px; }
-.col-nis{ width:122px; }
-.col-ket{ flex:1; }
-
-.anima-head .label{ font:var(--heading-h6); color:var(--neutralblack-1); }
+.anima-row:hover{
+  box-shadow: 0 2px 10px rgba(0,0,0,.04);
+  border-color: var(--neutralgrey-9);
+}
 .anima-row .text{ font:var(--para-sm); color:var(--neutralblack-1); }
 .anima-row .muted{ color:var(--neutralgrey-6); }
 
-/* Checkbox gaya minimal: tetap native tapi rapi */
+/* ==== Sel / kolom ==== */
+.anima-col{ padding:0; }              /* padding sudah di tingkat baris */
+.col-check{ display:flex; justify-content:center; }
+.col-name, .col-nis, .col-ket{ min-width:0; } /* supaya ellipsis bekerja */
+.anima-nowrap{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.col-name > .anima-nowrap,
+.col-nis > .anima-nowrap,
+.col-ket > .anima-nowrap{ display:block; }
+
+/* ==== Checkbox native (rapi) ==== */
 .anima-checkbox{ width:18px; height:18px; cursor:pointer; }
 
-/* Sticky header opsional */
+/* ==== Opsi sticky head (kalau di dalam container scroll) ==== */
 .anima-sticky thead{ position:sticky; top:0; z-index:5; }
 
-/* Scroll area kalau mau fix-height */
+/* ==== Area scroll khusus tubuh table (opsional) ==== */
 .anima-body.scroll{ max-height:360px; overflow:auto; }
 
-/* Utility */
-.anima-nowrap{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* ==== Zebra (opsional) ==== */
+/* .anima-row:nth-child(even){ background:#fafbff; } */
+
+/* ==== Density mode (opsional) ==== */
+.anima-table.compact .anima-row{ --row-pad-y:8px; --row-pad-x:12px; --row-gap:6px; --cell-gap:10px; --radius:8px; }
+.anima-table.comfy   .anima-row{ --row-pad-y:14px; --row-pad-x:18px; --row-gap:12px; }
+
+/* ==== Responsive: sembunyikan kolom NIS di layar sempit ==== */
+@media (max-width: 720px){
+  .anima-head,
+  .anima-row{
+    grid-template-columns: var(--col-check) minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .col-nis{ display:none; }
+}
+
+/* ==== Util tambahan untuk action buttons di dalam kolom ==== */
+.anima-row .col-actions .btn{ white-space:nowrap; }
+.anima-row .col-actions .btn + .btn{ margin-left:8px; }
+
+/* biar menu dropdown nggak ter-clipping sama table wrapper */
+.anima-table { overflow: visible !important; }
+
+/* kalau butuh sudut rounded tetap aman, barisnya tetap visible */
+.anima-row { position: relative; overflow: visible; }
+
+/* dropdown scrollable + enak di mobile */
+.dropdown-menu {
+  max-height: 280px;              /* atau 50vh kalau mau dinamis */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}

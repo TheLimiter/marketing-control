@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{MasterSekolah, PenggunaanModul, Modul};
+use App\Models\AktivitasProspek;
+use App\Models\MasterSekolah;
+use App\Models\PenggunaanModul;
+use App\Models\Modul;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -14,129 +17,167 @@ class ProgressModulController extends Controller
     private function logAktivitas(MasterSekolah $master, string $hasil, ?string $catatan = null): void
     {
         $master->aktivitas()->create([
-            'tanggal'    => now(),
-            'jenis'      => 'modul_progress',
-            'hasil'      => $hasil,
-            'catatan'    => $catatan,
+            'tanggal'   => now(),
+            'jenis'     => 'modul_progress',
+            'hasil'     => $hasil,
+            'catatan'   => $catatan,
             'created_by' => Auth::id(),
         ]);
     }
 
-    /** List sekolah + ringkasan progress (untuk Progress Modul). */
+    /**
+     * List sekolah + ringkasan progress + agregat stage penggunaan modul.
+     * Mengembalikan paginator $items (agar sesuai blade).
+     */
     public function index(Request $r)
     {
         $search   = trim($r->get('q', ''));
         $today    = now()->toDateString();
         $weekAgo  = now()->subDays(7)->toDateString();
         $perPage  = (int) $r->get('per_page', 15);
+        $sort     = $r->get('sort', 'updated_desc'); // updated_desc|updated_asc|progress_desc|progress_asc|school_asc|school_desc
+        $status   = $r->get('status');               // done|ontrack|berjalan|baru|belum
 
-        // hitung selesai (tanpa alias ganda)
-        $selesaiExpr = "SUM(CASE WHEN (LOWER(COALESCE(status,'')) IN ('selesai','done','complete','completed','ended') OR finished_at IS NOT NULL) THEN 1 ELSE 0 END)";
+        // apakah kolom stage_modul ada di tabel penggunaan_modul
+        $hasStageCol = Schema::hasColumn('penggunaan_modul', 'stage_modul');
 
-        $rows = MasterSekolah::query()
-            ->select('master_sekolah.*')                      // pastikan kolom sekolah ikut
-            ->withCount(['penggunaanModul as total_modul'])   // total baris modul
-            ->when($search !== '', fn ($q) =>
-                $q->where('nama_sekolah', 'like', "%{$search}%")
-            )
-            ->whereHas('penggunaanModul') // hanya yg punya penggunaan modul
+        // kondisi "done"
+        $doneCond = "(LOWER(COALESCE(status,'')) IN ('selesai','done','complete','completed','ended') OR finished_at IS NOT NULL)";
+
+        // ekspresi agregat stage
+        if ($hasStageCol) {
+            $expDil     = "SUM(CASE WHEN LOWER(COALESCE(stage_modul,'')) = 'dilatih'    THEN 1 ELSE 0 END)";
+            $expDidamp  = "SUM(CASE WHEN LOWER(COALESCE(stage_modul,'')) = 'didampingi' THEN 1 ELSE 0 END)";
+            $expMandiri = "SUM(CASE WHEN LOWER(COALESCE(stage_modul,'')) = 'mandiri'    THEN 1 ELSE 0 END)";
+        } else {
+            // fallback heuristik
+            $expMandiri = "SUM(CASE WHEN {$doneCond} THEN 1 ELSE 0 END)";
+            $expDidamp  = "SUM(CASE WHEN NOT ({$doneCond}) AND mulai_tanggal IS NOT NULL THEN 1 ELSE 0 END)";
+            $expDil     = "SUM(CASE WHEN NOT ({$doneCond}) AND (mulai_tanggal IS NULL) THEN 1 ELSE 0 END)";
+        }
+
+        $selesaiExpr = "SUM(CASE WHEN {$doneCond} THEN 1 ELSE 0 END)";
+
+        $items = MasterSekolah::query()
+            ->select('master_sekolah.*')
+            ->withCount(['penggunaanModul as total_modul'])
+            ->when($search !== '', fn ($q) => $q->where('nama_sekolah', 'like', "%{$search}%"))
+            ->whereHas('penggunaanModul')
             ->addSelect([
-                // selesai
                 'selesai' => PenggunaanModul::selectRaw($selesaiExpr)
                     ->whereColumn('master_sekolah_id', 'master_sekolah.id'),
-                // last update
                 'last_update' => PenggunaanModul::selectRaw('MAX(COALESCE(updated_at, created_at))')
                     ->whereColumn('master_sekolah_id', 'master_sekolah.id'),
-                // merah: ada yang akhir_tanggal < today dan belum ended
-                'overdue_cnt' => PenggunaanModul::selectRaw('COUNT(*)')
+                'latest_activity_data' => AktivitasProspek::selectRaw("CONCAT(COALESCE(catatan, ''), '|||', COALESCE(hasil, ''))")
                     ->whereColumn('master_sekolah_id', 'master_sekolah.id')
-                    ->whereNotNull('akhir_tanggal')
-                    ->whereDate('akhir_tanggal', '<', $today)
-                    ->where(function ($q) {
-                        $q->whereNull('status')->orWhere('status', '!=', 'ended');
-                    }),
-                // kuning: mulai_tanggal <= 7 hari yang lalu (apa pun status)
-                'aging_cnt' => PenggunaanModul::selectRaw('COUNT(*)')
-                    ->whereColumn('master_sekolah_id', 'master_sekolah.id')
-                    ->whereNotNull('mulai_tanggal')
-                    ->whereDate('mulai_tanggal', '<=', $weekAgo),
+                    ->where(function ($q2) {
+                        $q2->where('jenis', 'like', 'modul_%')
+                           ->orWhereIn('jenis', ['modul_progress','modul_done','modul_reopen','modul_attach']);
+                    })
+                    ->latest('tanggal')
+                    ->limit(1),
+                'cnt_dilatih'    => PenggunaanModul::selectRaw($expDil)->whereColumn('master_sekolah_id', 'master_sekolah.id'),
+                'cnt_didampingi' => PenggunaanModul::selectRaw($expDidamp)->whereColumn('master_sekolah_id', 'master_sekolah.id'),
+                'cnt_mandiri'    => PenggunaanModul::selectRaw($expMandiri)->whereColumn('master_sekolah_id', 'master_sekolah.id'),
             ])
             ->orderByDesc('last_update')
             ->paginate($perPage)
-            ->appends($r->query());
+            ->withQueryString();
 
-        // hitung persen per baris
-        $rows->getCollection()->transform(function ($row) {
+        $collection = $items->getCollection()->map(function ($row) {
             $row->progress_percent = $row->total_modul > 0
                 ? (int) round(($row->selesai / $row->total_modul) * 100)
                 : 0;
             return $row;
         });
+        $items->setCollection($collection);
 
-        return view('progress_modul.index', compact('rows', 'search'));
+        // Ambil summary global (tidak terpengaruh paginasi)
+        // FIX: Query dioptimalkan untuk performa dan memperbaiki syntax error PostgreSQL
+        $summaryQuery = DB::table('penggunaan_modul')
+            ->selectRaw('COUNT(DISTINCT master_sekolah_id) as total_sekolah')
+            ->selectRaw('COUNT(*) as total_modul')
+            ->selectRaw("SUM(CASE WHEN {$doneCond} THEN 1 ELSE 0 END) as total_selesai")
+            ->first();
+
+        $totalModul = $summaryQuery->total_modul ?? 0;
+        $totalSelesai = $summaryQuery->total_selesai ?? 0;
+        $avgProgress = $totalModul > 0 ? round(($totalSelesai / $totalModul) * 100) : 0;
+
+        $summary = [
+            'total_modul' => $totalModul,
+            'total_selesai' => $totalSelesai,
+            'avg_progress' => $avgProgress,
+        ];
+
+        return view('progress_modul.index', [
+            'items'   => $items,
+            'search'  => $search,
+            'summary' => $summary,
+        ]);
     }
 
-    /** Detail progress modul satu sekolah. */
-   public function show(MasterSekolah $master)
-{
-    $today   = now()->startOfDay();
-    $weekAgo = $today->copy()->subDays(7);
+    /** Detail progress modul satu sekolah + daftar aktivitas modul. */
+    public function show(MasterSekolah $master, Request $r)
+    {
+        $today   = now()->startOfDay();
+        $weekAgo = $today->copy()->subDays(7);
 
-    $modulCols = Schema::hasColumn('modul','urutan')
-        ? ['id','nama','urutan']
-        : ['id','nama'];
+        $modulCols = Schema::hasColumn('modul','urutan')
+            ? ['id','nama','urutan']
+            : ['id','nama'];
 
-    $items = PenggunaanModul::with(['modul' => function ($q) use ($modulCols) {
-            $q->select($modulCols);
-        }])
-        ->where('master_sekolah_id', $master->id)
-        ->get()
-        ->sortBy(function ($x) {
-            if (Schema::hasColumn('modul','urutan') && isset($x->modul->urutan)) {
-                return $x->modul->urutan;
-            }
-            return $x->modul->nama ?? $x->modul_id;
-        })
-        ->values();
+        $items = PenggunaanModul::with(['modul' => function ($q) use ($modulCols) {
+                $q->select($modulCols);
+            }])
+            ->where('master_sekolah_id', $master->id)
+            ->get()
+            ->sortBy(function ($x) {
+                if (Schema::hasColumn('modul','urutan') && isset($x->modul->urutan)) {
+                    return $x->modul->urutan;
+                }
+                return $x->modul->nama ?? $x->modul_id;
+            })
+            ->values();
 
-    $selesai    = $items->filter(fn ($x) => $x->isDone())->count();
-    $total      = $items->count();
-    $aktif      = $items->filter(fn ($x) => $x->isActive())->count();
-    $belumAda   = $total - $selesai - $aktif;
-    $percent    = $total ? (int) floor(($selesai / $total) * 100) : 0;
-    $lastUpdate = optional($items->max('updated_at'));
-    $staleDays  = (int) env('PROGRESS_STALE_DAYS', 7);
-    $nextItem   = $items->first(fn ($x) => !$x->isDone());
+        $selesai    = $items->filter(fn ($x) => $x->isDone())->count();
+        $total      = $items->count();
+        $aktif      = $items->filter(fn ($x) => $x->isActive())->count();
+        $belumAda   = $total - $selesai - $aktif;
+        $percent    = $total ? (int) floor(($selesai / $total) * 100) : 0;
+        $lastUpdate = optional($items->max('updated_at'));
+        $staleDays  = (int) env('PROGRESS_STALE_DAYS', 7);
+        $nextItem   = $items->first(fn ($x) => !$x->isDone());
 
-    $uiRows = $items->map(function ($x) use ($master, $today, $weekAgo) {
-        $done      = $x->isDone();
-        $overdue   = !$done && $x->akhir_tanggal && $x->akhir_tanggal->lt($today) && ($x->status !== 'ended');
-        $aging     = !$overdue && $x->mulai_tanggal && $x->mulai_tanggal->lte($weekAgo);
-        $cellClass = $overdue ? 'cell-danger' : ($aging ? 'cell-warning' : '');
+        // === Aktivitas Modul (modul_*) + filter/pagination terpisah ===
+        $perAct = (int) $r->get('per_act', 10);
 
-        $ket = match (true) {
-            $x->mulai_tanggal && $x->akhir_tanggal => $x->mulai_tanggal->format('d/m/y').' - '.$x->akhir_tanggal->format('d/m/y'),
-            $x->mulai_tanggal => 'Mulai '.$x->mulai_tanggal->format('d/m/y'),
-            $x->akhir_tanggal => 'Selesai '.$x->akhir_tanggal->format('d/m/y'),
-            default => 'Tambah keterangan',
-        };
+        $logAkt = AktivitasProspek::query()
+            ->with([
+                'creator:id,name',
+                'files:id,aktivitas_id,original_name,size,mime,path',
+                'paymentFiles:id,aktivitas_id,original_name,size,mime,path',
+            ])
+            ->where('master_sekolah_id', $master->id)
+            ->where(function($q){
+                $q->where('jenis', 'like', 'modul_%')
+                  ->orWhereIn('jenis', ['modul_progress','modul_done','modul_reopen','modul_attach']);
+            })
+            ->when($r->filled('q'), fn($q2) => $q2->where(function($w) use ($r) {
+                $s = trim($r->q);
+                $w->where('hasil', 'like', "%{$s}%")->orWhere('catatan', 'like', "%{$s}%");
+            }))
+            ->when($r->filled('from'), fn($q2) => $q2->whereDate('tanggal', '>=', $r->date('from')))
+            ->when($r->filled('to'),   fn($q2) => $q2->whereDate('tanggal', '<=', $r->date('to')))
+            ->orderByDesc('tanggal')->orderByDesc('id')
+            ->paginate($perAct, ['*'], 'act_page')
+            ->withQueryString();
 
-        return [
-            'checked'   => $done,
-            'nama'      => $x->modul->nama ?? ('Modul #'.$x->modul_id),
-            'nis'       => ($x->modul->urutan ?? null) ?? $x->modul_id, // tetap aman
-            'ket'       => $ket,
-            'cellClass' => $cellClass,
-            'toggle'    => route('progress.toggle', [$master->id, $x->id]),
-        ];
-    })->all();
-
-    return view('progress_modul.show', compact(
-        'master','items','total','selesai','aktif','belumAda',
-        'percent','lastUpdate','nextItem','uiRows','staleDays'
-    ));
-}
-
+        return view('progress_modul.show', compact(
+            'master','items','total','selesai','aktif','belumAda',
+            'percent','lastUpdate','nextItem','staleDays','logAkt','perAct'
+        ));
+    }
 
     /** Matriks 1-9 (tanpa perubahan besar). */
     public function matrix(Request $r)
@@ -192,7 +233,7 @@ class ProgressModulController extends Controller
         PenggunaanModul::create([
             'master_sekolah_id' => $master->id,
             'modul_id'          => $modul->id,
-            'status'            => PenggunaanModul::ST_PROGRESS, // konsisten
+            'status'            => PenggunaanModul::ST_PROGRESS,
             'mulai_tanggal'     => now(),
             'is_official'       => false,
             'created_by'        => Auth::id(),
@@ -239,43 +280,99 @@ class ProgressModulController extends Controller
         ])->save();
 
         $label = $pm->modul->nama ?? ('Modul #'.$pm->modul_id);
-        $note  = trim(($pm->mulai_tanggal?->format('d/m/Y') ?? '-').''.($pm->akhir_tanggal?->format('d/m/Y') ?? '-'));
+        $note  = trim(($pm->mulai_tanggal?->format('d/m/Y') ?? '-').' — '.($pm->akhir_tanggal?->format('d/m/Y') ?? '-'));
         $this->logAktivitas($master, 'Ubah tanggal '.$label, $note);
 
         return back()->with('ok','Tanggal diperbarui.');
     }
 
-    /** Pastikan baris 1-9 ada semua. */
-    public function ensure(MasterSekolah $master)
+    /** NEW: Ubah stage per baris (mirip updateStage di MasterSekolah). */
+    public function updateStageModul(Request $r, MasterSekolah $master, PenggunaanModul $pm)
     {
-        $mods = Modul::query()
-            ->when(Schema::hasColumn('modul', 'urutan'), fn ($q) => $q->orderBy('urutan'))
-            ->orderBy('id')->take(9)->get(['id','nama']);
+        if ($pm->master_sekolah_id !== $master->id) abort(404);
 
-        if ($mods->isEmpty()) return back()->with('warn','Belum ada data modul.');
+        $data = $r->validate([
+            'stage_modul' => 'required|in:dilatih,didampingi,mandiri',
+            'note'        => 'nullable|string|max:500',
+        ]);
 
-        $existing = PenggunaanModul::where('master_sekolah_id',$master->id)
-            ->whereIn('modul_id', $mods->pluck('id'))->pluck('modul_id')->all();
+        $pm->update(['stage_modul' => $data['stage_modul']]);
 
-        $created = 0;
-        foreach ($mods as $m) {
-            if (!in_array($m->id, $existing, true)) {
-                PenggunaanModul::create([
-                    'master_sekolah_id' => $master->id,
-                    'modul_id'          => $m->id,
-                    'status'            => PenggunaanModul::ST_PROGRESS,
-                    'mulai_tanggal'     => now(),
-                    'is_official'       => false,
-                    'created_by'        => Auth::id(),
-                    'updated_by'        => Auth::id(),
-                ]);
-                $created++;
+        $labelModul = $pm->modul->nama ?? ('Modul #'.$pm->modul_id);
+        $this->logAktivitas(
+            $master,
+            "Ubah stage modul: {$labelModul} → ".ucfirst($data['stage_modul']),
+            $data['note'] ?? null
+        );
+
+        return back()->with('ok','Stage penggunaan modul diperbarui.');
+    }
+
+    /** NEW: Ubah stage banyak baris sekaligus milik sekolah. */
+    public function bulkUpdateStageModul(Request $r, MasterSekolah $master)
+    {
+        $data = $r->validate([
+            'stage_modul' => 'required|in:dilatih,didampingi,mandiri',
+            'modul_ids'   => 'nullable|array',
+            'modul_ids.*' => 'integer|exists:penggunaan_modul,id',
+            'note'        => 'nullable|string|max:500',
+        ]);
+
+        $q = PenggunaanModul::where('master_sekolah_id', $master->id);
+        if (!empty($data['modul_ids'])) {
+            $q->whereIn('id', $data['modul_ids']);
+        }
+        $count = $q->update(['stage_modul' => $data['stage_modul']]);
+
+        $this->logAktivitas(
+            $master,
+            "Bulk ubah stage modul → ".ucfirst($data['stage_modul']),
+            ($data['note'] ?? '')." (".$count." baris)"
+        );
+
+        return back()->with('ok', "Stage {$count} baris penggunaan diperbarui.");
+    }
+
+    /** Quick-add Aktivitas Modul (jenis fixed = modul_progress). */
+    public function storeAktivitas(Request $request, MasterSekolah $master)
+    {
+        $data = $request->validate([
+            'hasil'    => ['required','string','max:150'],
+            'catatan'  => ['nullable','string'],
+            'modul_id' => ['nullable','integer','exists:modul,id'],
+            'files.*'  => ['file','max:5120','mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx,ppt,pptx'],
+        ]);
+
+        $hasil = $data['hasil'];
+        if (!empty($data['modul_id'])) {
+            $m = Modul::find($data['modul_id']);
+            if ($m) {
+                $hasil = '['.$m->nama.'] '.$hasil;
             }
         }
 
-        if ($created > 0) $this->logAktivitas($master, "Lengkapi baris modul (buat $created)");
+        $aktivitas = $master->aktivitas()->create([
+            'tanggal'    => now(),
+            'jenis'      => 'modul_progress',
+            'hasil'      => $hasil,
+            'catatan'    => $data['catatan'] ?? null,
+            'created_by' => auth()->id(),
+        ]);
 
-        return back()->with('ok', $created ? "Ditambah $created baris modul." : 'Semua baris 1-9 sudah lengkap.');
+        if ($request->hasFile('files')) {
+            foreach ($request->file('files') as $f) {
+                if (!$f->isValid()) continue;
+                $path = $f->store('aktivitas', 'public');
+                $aktivitas->files()->create([
+                    'path'          => $path,
+                    'original_name' => $f->getClientOriginalName(),
+                    'size'          => $f->getSize(),
+                    'mime'          => $f->getMimeType(),
+                ]);
+            }
+        }
+
+        return back()->with('ok', 'Aktivitas modul berhasil ditambahkan.');
     }
 
     /** Export CSV matriks. */
@@ -328,3 +425,4 @@ class ProgressModulController extends Controller
         }, $filename, ['Content-Type' => 'text/csv']);
     }
 }
+

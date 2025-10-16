@@ -13,33 +13,48 @@ use Illuminate\Validation\Rule;
 
 class PenggunaanModulController extends Controller
 {
-    public function index(Request $r)
-    {
-        $items = PenggunaanModul::with(['master:id,nama_sekolah,stage', 'modul:id,nama'])
-            ->when($r->filled('q'), fn ($q) => $q->whereHas('master', fn ($m) => $m->where('nama_sekolah', 'like', '%'.$r->q.'%')))
-            ->when($r->filled('modul_id'), fn ($q) => $q->where('modul_id', (int) $r->modul_id))
-            ->when($r->filled('lisensi'), function ($q) use ($r) {
-                if ($r->lisensi === 'official') $q->where('is_official', 1);
-                if ($r->lisensi === 'trial')  $q->where('is_official', 0);
-            })
-            ->when($r->filled('status'), fn ($q) => $q->where('status', $r->status))
-            ->when($r->filled('stage'), fn ($q) => $q->whereHas('master', fn ($m) => $m->where('stage', (int) $r->stage)))
-            ->orderByDesc('last_used_at')
-            ->orderBy('mulai_tanggal')
-            ->paginate(15)
-            ->withQueryString();
+   public function index(Request $r)
+{
+    $items = PenggunaanModul::with([
+            'master:id,nama_sekolah,stage',
+            'modul:id,nama',
+            // pastikan nama relasi ini sesuai dengan relasi di model (latestActivity)
+            'latestActivityModule.creator:id,name',
+        ])
+        ->when($r->filled('q'), fn ($q) => $q->whereHas('master', fn ($m) => $m->where('nama_sekolah', 'like', '%'.$r->q.'%')))
+        ->when($r->filled('modul_id'), fn ($q) => $q->where('modul_id', (int) $r->modul_id))
+        ->when($r->filled('lisensi'), function ($q) use ($r) {
+            if ($r->lisensi === 'official') $q->where('is_official', 1);
+            if ($r->lisensi === 'trial')  $q->where('is_official', 0);
+        })
+        ->when($r->filled('status'), fn ($q) => $q->where('status', $r->status))
+        ->when($r->filled('stage'), fn ($q) => $q->whereHas('master', fn ($m) => $m->where('stage', (int) $r->stage)))
+        ->orderByDesc('last_used_at')
+        ->orderBy('mulai_tanggal')
+        ->paginate(15)
+        ->withQueryString();
 
-        $modulOptions = Modul::orderBy('nama')->get(['id', 'nama']);
-        $stageOptions = [
-            MS::ST_CALON => 'Calon',
-            MS::ST_PROSPEK => 'Prospek',
-            MS::ST_NEGOSIASI => 'Negosiasi',
-            MS::ST_MOU => 'MOU',
-            MS::ST_KLIEN => 'Klien',
-        ];
+    $modulOptions = Modul::orderBy('nama')->get(['id', 'nama']);
 
-        return view('penggunaan_modul.index', compact('items', 'modulOptions', 'stageOptions'));
-    }
+    // === STAGE OPTIONS: skema baru ===
+    $stageOptions = [
+        MS::ST_CALON  => 'Calon',
+        MS::ST_SHB    => 'sudah dihubungi',
+        MS::ST_SLTH   => 'sudah dilatih',
+        MS::ST_MOU    => 'MOU Aktif',
+        MS::ST_TLMOU  => 'Tindak lanjut MOU',
+        MS::ST_TOLAK  => 'Ditolak',
+    ];
+
+    // kirim items *dan* rows (alias) agar view yang memakai $rows tetap bekerja
+    return view('penggunaan_modul.index', [
+        'items' => $items,
+        'rows'  => $items,
+        'modulOptions' => $modulOptions,
+        'stageOptions' => $stageOptions,
+    ]);
+}
+
 
     public function create()
     {
@@ -82,7 +97,7 @@ class PenggunaanModulController extends Controller
     {
         $data = $r->validate([
             'modul_id'        => ['required','integer','exists:modul,id',
-                \Illuminate\Validation\Rule::unique('penggunaan_modul','modul_id')
+                Rule::unique('penggunaan_modul','modul_id')
                     ->where(fn($q)=>$q->where('master_sekolah_id',$master->id))
             ],
             'mulai_tanggal'   => ['nullable','date'],
@@ -93,30 +108,32 @@ class PenggunaanModulController extends Controller
             'catatan'         => ['nullable','string','max:1000'],
         ], ['modul_id.unique'=>'Modul ini sudah terpasang pada sekolah tersebut.']);
 
-        $last  = \App\Models\PenggunaanModul::where('master_sekolah_id',$master->id)->latest('created_at')->first();
+        $last  = PenggunaanModul::where('master_sekolah_id',$master->id)->latest('created_at')->first();
         $mulai = $data['mulai_tanggal'] ?? now()->toDateString();
 
-        // SIMPAN PM (perbaiki: pakai kolom 'catatan', bukan 'notes')
-        $pm = \App\Models\PenggunaanModul::create([
+        // SIMPAN PM (pakai kolom 'catatan' yang sudah diselaraskan di Model)
+        $pm = PenggunaanModul::create([
             'master_sekolah_id' => $master->id,
             'modul_id'          => (int)$data['modul_id'],
-            'status'            => \App\Models\PenggunaanModul::ST_ATTACHED,
+            'status'            => PenggunaanModul::ST_ATTACHED,
             'mulai_tanggal'     => $mulai,
             'akhir_tanggal'     => $data['akhir_tanggal'] ?? null,
             'is_official'       => $r->boolean('is_official', (bool) optional($last)->is_official),
             'pengguna_nama'     => $data['pengguna_nama']   ?? optional($last)->pengguna_nama,
             'pengguna_kontak'   => $data['pengguna_kontak'] ?? optional($last)->pengguna_kontak,
-            'catatan'           => $data['catatan'] ?? null,   // <-- FIX DISINI
+            'catatan'           => $data['catatan'] ?? null,
             'created_by'        => auth()->id(),
             'updated_by'        => auth()->id(),
         ]);
 
-        // CATAT AKTIVITAS (global & per-sekolah)
-        \App\Models\AktivitasProspek::create([
+        // CATAT AKTIVITAS (sertakan modul_id agar module-specific activity dapat terdeteksi)
+        AktivitasProspek::create([
             'master_sekolah_id' => $master->id,
+            'modul_id'          => $pm->modul_id,
             'tanggal'           => now(),
-            'jenis'             => 'module_assign',                 // konsisten dg model
-            'hasil'             => $pm->modul->nama ?? 'Modul',     // ambil nama modul
+            // konsisten dengan label yang sudah ada di Model Aktivitas: 'modul_attach'
+            'jenis'             => 'modul_attach',
+            'hasil'             => $pm->modul->nama ?? 'Modul',
             'catatan'           => $data['catatan'] ?? null,
             'created_by'        => auth()->id(),
         ]);
@@ -160,6 +177,17 @@ class PenggunaanModulController extends Controller
                 if ($pm->wasRecentlyCreated) {
                     $created++;
                     $rows[] = $pm;
+
+                    // optional: catat aktivitas per modul (boleh dihapus jika terlalu ramai)
+                    AktivitasProspek::create([
+                        'master_sekolah_id' => $schoolId,
+                        'modul_id'          => $mid,
+                        'tanggal'           => now(),
+                        'jenis'             => 'modul_attach',
+                        'hasil'             => optional($pm->modul)->nama ?? "Modul #{$mid}",
+                        'catatan'           => null,
+                        'created_by'        => auth()->id(),
+                    ]);
                 } else {
                     $skipped++;
                 }
@@ -252,6 +280,7 @@ class PenggunaanModulController extends Controller
 
         AktivitasProspek::create([
             'master_sekolah_id' => $pm->master_sekolah_id,
+            'modul_id'          => $pm->modul_id, // <-- penting agar module-specific activity dapat terdeteksi
             'tanggal'           => now(),
             'jenis'             => 'module_use',
             'hasil'             => $pm->modul->nama ?? 'Modul',
@@ -284,7 +313,9 @@ class PenggunaanModulController extends Controller
 
         AktivitasProspek::create([
             'master_sekolah_id' => $pm->master_sekolah_id,
+            'modul_id'          => $pm->modul_id, // sertakan modul_id
             'tanggal'           => now(),
+            // konsisten dengan parser hasil di Model Aktivitas (sudah handle 'module_status')
             'jenis'             => 'module_status',
             'hasil'             => ($pm->is_official ? 'official' : 'trial') . ' / ' . $pm->status,
             'catatan'           => $pm->catatan,
@@ -307,6 +338,17 @@ class PenggunaanModulController extends Controller
             'started_at' => $pm->started_at ?? now(),
         ]);
 
+        // optional: catat aktivitas start (modul_id included)
+        AktivitasProspek::create([
+            'master_sekolah_id' => $pm->master_sekolah_id,
+            'modul_id'          => $pm->modul_id,
+            'tanggal'           => now(),
+            'jenis'             => 'module_start',
+            'hasil'             => $pm->modul->nama ?? 'Modul',
+            'catatan'           => null,
+            'created_by'        => auth()->id(),
+        ]);
+
         return back()->with('ok', 'Progress dimulai.');
     }
 
@@ -317,6 +359,16 @@ class PenggunaanModulController extends Controller
         $pm->update([
             'status'      => PenggunaanModul::ST_DONE,
             'finished_at' => now(),
+        ]);
+
+        AktivitasProspek::create([
+            'master_sekolah_id' => $pm->master_sekolah_id,
+            'modul_id'          => $pm->modul_id,
+            'tanggal'           => now(),
+            'jenis'             => 'modul_done',
+            'hasil'             => $pm->modul->nama ?? 'Modul',
+            'catatan'           => null,
+            'created_by'        => auth()->id(),
         ]);
 
         return back()->with('ok', 'Modul ditandai selesai.');
@@ -330,6 +382,16 @@ class PenggunaanModulController extends Controller
             'status'      => PenggunaanModul::ST_REOPEN,
             'reopened_at' => now(),
             'finished_at' => null,
+        ]);
+
+        AktivitasProspek::create([
+            'master_sekolah_id' => $pm->master_sekolah_id,
+            'modul_id'          => $pm->modul_id,
+            'tanggal'           => now(),
+            'jenis'             => 'modul_reopen',
+            'hasil'             => $pm->modul->nama ?? 'Modul',
+            'catatan'           => null,
+            'created_by'        => auth()->id(),
         ]);
 
         return back()->with('ok', 'Modul di-reopen.');

@@ -53,29 +53,34 @@ class AppServiceProvider extends ServiceProvider
             MasterSekolah::observe(MasterSekolahObserver::class);
         }
 
-        // Kirimkan statistik ke layout utama saja biar hemat
-        View::composer('layouts.app', function ($view) {
-            try {
-                $navStats = [
-                    'prospek'      => MS::where('stage', MS::ST_PROSPEK)->count(),
-                    'negosiasi'    => MS::where('stage', MS::ST_NEGOSIASI)->count(),
-                    'mou'          => MS::where('stage', MS::ST_MOU)->count(),
-                    'klien'        => MS::where('stage', MS::ST_KLIEN)->count(),
-                    'klienNoMou'   => MS::where('stage', MS::ST_KLIEN)->whereNull('mou_path')->count(),
-                    'aktivitasNow' => AktivitasProspek::whereDate('tanggal', now()->toDateString())->count(),
-                ];
-            } catch (\Throwable $e) {
-                $navStats = [
-                    'prospek'      => 0,
-                    'negosiasi'    => 0,
-                    'mou'          => 0,
-                    'klien'        => 0,
-                    'klienNoMou'   => 0,
-                    'aktivitasNow' => 0,
-                ];
-            }
+        // Kirimkan statistik ke layout utama (versi stage BARU)
+View::composer('layouts.app', function ($view) {
+    try {
+        $navStats = [
+            // stage baru
+            'shb'   => MS::where('stage', MS::ST_SHB)->count(),      // sudah dihubungi
+            'slth'  => MS::where('stage', MS::ST_SLTH)->count(),     // sudah dilatih
+            'mou'   => MS::where('stage', MS::ST_MOU)->count(),      // MOU Aktif
+            'tlmou' => MS::where('stage', MS::ST_TLMOU)->count(),    // Tindak lanjut MOU
+            'tolak' => MS::where('stage', MS::ST_TOLAK)->count(),    // Ditolak
 
-            $view->with('navStats', $navStats);
-        });
+            // MOU aktif/tindak lanjut tanpa file
+            'mouNoFile' => MS::whereIn('stage', [MS::ST_MOU, MS::ST_TLMOU])
+                              ->whereNull('mou_path')
+                              ->count(),
+
+            // indikator aktivitas: gunakan created_at agar konsisten dgn tabel Aktivitas
+            'aktivitasNow' => AktivitasProspek::whereDate('created_at', now()->toDateString())->count(),
+        ];
+    } catch (\Throwable $e) {
+        $navStats = [
+            'shb' => 0, 'slth' => 0, 'mou' => 0, 'tlmou' => 0, 'tolak' => 0,
+            'mouNoFile' => 0, 'aktivitasNow' => 0,
+        ];
+    }
+
+    $view->with('navStats', $navStats);
+});
+
     }
 }

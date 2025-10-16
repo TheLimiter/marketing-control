@@ -21,21 +21,22 @@
 <body data-bs-theme="light">
 @php
     use App\Models\MasterSekolah as MS;
-    // fallback jika $navStats belum diset
-    $navStats = $navStats ?? ['prospek'=>0,'negosiasi'=>0,'mou'=>0,'klien'=>0,'klienNoMou'=>0,'aktivitasNow'=>0];
+    // fallback nav stats (keys baru)
+    $navStats = $navStats ?? [
+        'shb'=>0, 'slth'=>0, 'mou'=>0, 'tlmou'=>0, 'tolak'=>0, 'mouNoFile'=>0, 'aktivitasNow'=>0
+    ];
     $is = fn($name) => request()->routeIs($name);
 @endphp
 
 {{-- TOPBAR --}}
 <header class="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top py-2">
     <div class="container-fluid">
-        {{-- (hapus tombol offcanvas) --}}
         <a class="navbar-brand fw-semibold" href="{{ route('dashboard') }}">
             <i class="bi bi-kanban"></i> Marketing Control
         </a>
 
         <div class="d-flex align-items-center gap-2 ms-auto">
-            {{-- Toggle mini sidebar (desktop & mobile) --}}
+            {{-- Toggle mini sidebar --}}
             <button id="btnMiniToggle" class="btn btn-ghost round" type="button" title="Kecilkan sidebar">
                 <i class="bi bi-layout-sidebar-inset-reverse"></i>
             </button>
@@ -67,7 +68,7 @@
 </script>
 
 <div class="mc-layout">
-    {{-- ===== SIDEBAR: FIXED (BUKAN OFFCANVAS) ===== --}}
+    {{-- ===== SIDEBAR (fixed) ===== --}}
     <aside id="mcSidebar" class="mc-sidebar d-flex flex-column">
         <div class="mc-sidebar-body p-0 d-flex flex-column">
             <nav class="nav flex-column mc-nav py-2">
@@ -83,51 +84,68 @@
                     </a>
                 @endif
 
-                {{-- Quick Stage --}}
+                {{-- Quick Stage (skema baru) --}}
                 @if(Route::has('master.index'))
-                    <a class="nav-link {{ $is('master.*') && (string)request('stage')==='2' ? 'active' : '' }}"
-                       href="{{ route('master.index', ['stage'=>MS::ST_PROSPEK]) }}" title="Prospek">
-                        <i class="bi bi-person-lines-fill"></i> <span>Prospek</span>
-                        <span class="badge bg-secondary rounded-pill ms-auto">{{ $navStats['prospek'] ?? 0 }}</span>
+                    <a class="nav-link {{ $is('master.*') && (string)request('stage')===(string)MS::ST_SHB ? 'active' : '' }}"
+                       href="{{ route('master.index', ['stage'=>MS::ST_SHB]) }}" title="sudah dihubungi">
+                        <i class="bi bi-person-lines-fill"></i> <span>Sudah Dihubungi</span>
+                        <span class="badge bg-secondary rounded-pill ms-auto">{{ $navStats['shb'] ?? 0 }}</span>
                     </a>
 
-                    <a class="nav-link {{ $is('master.*') && (string)request('stage')==='3' ? 'active' : '' }}"
-                       href="{{ route('master.index', ['stage'=>MS::ST_NEGOSIASI]) }}" title="Negosiasi">
-                        <i class="bi bi-chat-dots"></i> <span>Negosiasi</span>
-                        <span class="badge bg-secondary rounded-pill ms-auto">{{ $navStats['negosiasi'] ?? 0 }}</span>
+                    <a class="nav-link {{ $is('master.*') && (string)request('stage')===(string)MS::ST_SLTH ? 'active' : '' }}"
+                       href="{{ route('master.index', ['stage'=>MS::ST_SLTH]) }}" title="sudah dilatih">
+                        <i class="bi bi-chat-dots"></i> <span>Sudah Dilatih</span>
+                        <span class="badge bg-secondary rounded-pill ms-auto">{{ $navStats['slth'] ?? 0 }}</span>
                     </a>
 
-                    <a class="nav-link {{ $is('master.*') && (string)request('stage')==='4' ? 'active' : '' }}"
-                       href="{{ route('master.index', ['stage'=>MS::ST_MOU]) }}" title="MOU">
-                        <i class="bi bi-file-earmark-text"></i> <span>MOU</span>
+                    <a class="nav-link {{ $is('master.*') && (string)request('stage')===(string)MS::ST_MOU ? 'active' : '' }}"
+                       href="{{ route('master.index', ['stage'=>MS::ST_MOU]) }}" title="MOU Aktif">
+                        <i class="bi bi-file-earmark-text"></i> <span>MOU Aktif</span>
                         <span class="badge bg-secondary rounded-pill ms-auto">{{ $navStats['mou'] ?? 0 }}</span>
                     </a>
 
-                    <a class="nav-link {{ $is('master.*') && (string)request('stage')==='5' ? 'active' : '' }}"
-                       href="{{ route('master.index', ['stage'=>MS::ST_KLIEN]) }}" title="Klien Aktif">
-                        <i class="bi bi-people"></i> <span>Klien Aktif</span>
-                        <span class="badge bg-secondary rounded-pill ms-auto">{{ $navStats['klien'] ?? 0 }}</span>
-                        @if(($navStats['klienNoMou'] ?? 0) > 0)
-                            <span class="badge bg-danger rounded-pill ms-2" title="Klien tanpa MOU">{{ $navStats['klienNoMou'] }}</span>
+                    <a class="nav-link {{ $is('master.*') && (string)request('stage')===(string)MS::ST_TLMOU ? 'active' : '' }}"
+                       href="{{ route('master.index', ['stage'=>MS::ST_TLMOU]) }}" title="Tindak lanjut MOU">
+                        <i class="bi bi-people"></i> <span>Tindak Lanjut MOU</span>
+                        <span class="badge bg-secondary rounded-pill ms-auto">{{ $navStats['tlmou'] ?? 0 }}</span>
+                        @if(($navStats['mouNoFile'] ?? 0) > 0)
+                            <span class="badge bg-warning rounded-pill ms-2" title="MOU tahap aktif/tindak lanjut tanpa file">{{ $navStats['mouNoFile'] }}</span>
                         @endif
+                    </a>
+
+                    <a class="nav-link {{ $is('master.*') && (string)request('stage')===(string)MS::ST_TOLAK ? 'active' : '' }}"
+                       href="{{ route('master.index', ['stage'=>MS::ST_TOLAK]) }}" title="Ditolak">
+                        <i class="bi bi-x-octagon"></i> <span>Ditolak</span>
+                        <span class="badge bg-danger rounded-pill ms-auto">{{ $navStats['tolak'] ?? 0 }}</span>
                     </a>
                 @endif
 
                 <div class="mc-sep my-2"></div>
 
                 {{-- Modul & Progress --}}
+                @if(Route::has('modul.index'))
                 <a class="nav-link {{ $is('modul.*') ? 'active' : '' }}" href="{{ route('modul.index') }}" title="Modul">
                     <i class="bi bi-box-seam"></i> <span>Modul</span>
                 </a>
+                @endif
+
+                @if(Route::has('penggunaan-modul.index'))
                 <a class="nav-link {{ $is('penggunaan-modul.*') ? 'active' : '' }}" href="{{ route('penggunaan-modul.index') }}" title="Penggunaan Modul">
                     <i class="bi bi-diagram-3"></i> <span>Penggunaan Modul</span>
                 </a>
+                @endif
+
+                @if(Route::has('progress.index'))
                 <a class="nav-link {{ $is('progress.index') ? 'active' : '' }}" href="{{ route('progress.index') }}" title="Progress Modul">
                     <i class="bi bi-graph-up-arrow"></i> <span>Progress Modul</span>
                 </a>
+                @endif
+
+                @if(Route::has('progress.matrix'))
                 <a class="nav-link {{ $is('progress.matrix') ? 'active' : '' }}" href="{{ route('progress.matrix') }}" title="Progress Modul (1-9)">
                     <i class="bi bi-grid-1x2"></i> <span>Progress Modul (1-9)</span>
                 </a>
+                @endif
 
                 <div class="mc-sep my-2"></div>
 
@@ -139,11 +157,13 @@
                     </a>
                 @endif
 
-                {{-- Tagihan & User --}}
+                {{-- Tagihan & Admin --}}
+                @if(Route::has('tagihan.index'))
                 <a class="nav-link {{ $is('tagihan.*') ? 'active' : '' }}"
-                href="{{ route('tagihan.index') }}" title="Tagihan">
-                <i class="bi bi-receipt"></i> <span>Tagihan</span>
+                   href="{{ route('tagihan.index') }}" title="Tagihan">
+                   <i class="bi bi-receipt"></i> <span>Tagihan</span>
                 </a>
+                @endif
 
                 @role('admin')
                   <li class="nav-item">
@@ -168,12 +188,12 @@
                 </button>
                 <div class="collapse" id="collapseAktivitas">
                     <ul class="list-unstyled small text-muted p-0">
-                        <li><span class="badge bg-secondary">MODUL_ASSIGN</span> = Pemberian/penggunaan modul ke sekolah</li>
-                        <li><span class="badge bg-dark">STAGE_CHANGE</span> = Perubahan/naik stage sekolah</li>
+                        <li><span class="badge bg-secondary">MODUL_ATTACH</span> = Lampiran modul</li>
+                        <li><span class="badge bg-dark">STAGE_CHANGE</span> = Perubahan stage sekolah</li>
                         <li><span class="badge bg-info">MODUL_PROGRESS</span> = Progres penggunaan modul</li>
                         <li><span class="badge bg-success">MODUL_DONE</span> = Modul selesai digunakan</li>
                         <li><span class="badge bg-warning">MODUL_REOPEN</span> = Modul dibuka ulang</li>
-                        <li><span class="badge bg-primary">KUNJUNGAN</span> = Kunjungan langsung ke sekolah</li>
+                        <li><span class="badge bg-primary">KUNJUNGAN</span> = Kunjungan langsung</li>
                         <li><span class="badge bg-secondary">MEETING</span> = Pertemuan tatap muka / online</li>
                         <li><span class="badge bg-success">WHATSAPP</span> = Komunikasi via WhatsApp</li>
                         <li><span class="badge bg-secondary">EMAIL</span> = Komunikasi via email</li>
@@ -210,9 +230,14 @@
             @endif
 
             @php
+                // Stage map baru untuk breadcrumb
                 $stageMap = [
-                    MS::ST_CALON=>'Calon', MS::ST_PROSPEK=>'Prospek', MS::ST_NEGOSIASI=>'Negosiasi',
-                    MS::ST_MOU=>'MOU', MS::ST_KLIEN=>'Klien',
+                    MS::ST_CALON   => 'Calon',
+                    MS::ST_SHB     => 'sudah dihubungi',
+                    MS::ST_SLTH    => 'sudah dilatih',
+                    MS::ST_MOU     => 'MOU Aktif',
+                    MS::ST_TLMOU   => 'Tindak lanjut MOU',
+                    MS::ST_TOLAK   => 'Ditolak',
                 ];
                 $routeName = optional(request()->route())->getName();
                 $crumbs = [ ['label'=>'Dashboard','url'=> route('dashboard')] ];
@@ -237,7 +262,7 @@
                 elseif ($routeName && str_starts_with($routeName,'aktivitas.'))            $crumbs[] = ['label'=>'Aktivitas','url'=>null];
                 elseif ($routeName && str_starts_with($routeName,'tagihan.'))              $crumbs[] = ['label'=>'Tagihan','url'=>null];
                 elseif ($routeName && str_starts_with($routeName,'modul.'))                $crumbs[] = ['label'=>'Modul/Produk','url'=>null];
-                elseif ($routeName && str_starts_with($routeName,'penggunaan-modul.'))   $crumbs[] = ['label'=>'Penggunaan Modul','url'=>null];
+                elseif ($routeName && str_starts_with($routeName,'penggunaan-modul.'))     $crumbs[] = ['label'=>'Penggunaan Modul','url'=>null];
                 elseif ($routeName && str_starts_with($routeName,'progress.'))             $crumbs[] = ['label'=>'Progress Modul','url'=>null];
                 elseif ($routeName && (str_starts_with($routeName,'users.') || str_starts_with($routeName,'admin.users.'))) $crumbs[] = ['label'=>'User Control','url'=>null];
             @endphp

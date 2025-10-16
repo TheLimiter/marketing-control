@@ -39,7 +39,6 @@ Route::middleware('guest')->group(function () {
 // === Auth (logout) ===
 Route::post('/logout', [LoginController::class, 'logout'])->middleware('auth')->name('logout');
 
-
 Route::middleware(['auth','active'])->group(function () {
     // --- Dashboard ---
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -66,7 +65,6 @@ Route::middleware(['auth','active'])->group(function () {
 
         // Calon -> Prospek
         Route::post('{calon}/jadikan-prospek', [ProspekController::class, 'storeFromCalon'])->name('jadikan-prospek');
-
     });
 
     // --- Prospek ---
@@ -95,6 +93,21 @@ Route::middleware(['auth','active'])->group(function () {
     Route::get('/tagihan/hitung', [TagihanController::class,'hitung'])->name('tagihan.hitung');
     Route::get('/tagihan/assigned-modules', [TagihanController::class,'assignedModules'])->name('tagihan.assigned');
 
+     // --- FITUR TRASH UNTUK TAGIHAN ---
+    // Route untuk menampilkan halaman data yang sudah di-soft delete
+    Route::get('tagihan/trash', [TagihanController::class, 'trash'])->name('tagihan.trash');
+
+    // Route untuk mengembalikan data dari sampah
+    Route::patch('tagihan/{id}/restore', [TagihanController::class, 'restore'])->name('tagihan.restore');
+
+    // Route untuk menghapus data secara permanen (hanya untuk admin)
+    Route::delete('tagihan/{id}/force', [TagihanController::class, 'forceDelete'])
+        ->middleware('role:admin')
+        ->name('tagihan.forceDelete');
+    // --- AKHIR FITUR TRASH ---
+
+    Route::get('tagihan/{tagihan}/bayar',  [TagihanController::class, 'bayarForm'])->name('tagihan.bayar');
+    Route::post('tagihan/{tagihan}/bayar', [TagihanController::class, 'bayarSimpan'])->name('tagihan.bayar.simpan');
 
 
     // Laporan & notifikasi
@@ -106,6 +119,11 @@ Route::middleware(['auth','active'])->group(function () {
     Route::post('tagihan/{tagihan}/notifikasi', [TagihanController::class, 'kirimNotifikasi'])->name('tagihan.notifikasi.kirim');
 
     Route::resource('tagihan', TagihanController::class);
+
+    // BARU: Force delete untuk tagihan
+    Route::delete('tagihan/{tagihan}/force', [TagihanController::class, 'forceDelete'])
+        ->middleware('role:admin')
+        ->name('tagihan.forceDelete');
 
     // Form pembayaran
     Route::get('tagihan/{tagihan}/bayar',  [TagihanController::class, 'bayarForm'])->name('tagihan.bayar');
@@ -174,6 +192,9 @@ Route::middleware(['auth','active'])->group(function () {
         // MOU
         Route::get('/{master}/mou', [MouController::class, 'form'])->name('mou.form');
         Route::post('/{master}/mou', [MouController::class, 'save'])->name('mou.save');
+        // BARU: Tambahkan rute untuk preview dan download MOU
+        Route::get('/{master}/mou/preview', [MouController::class, 'preview'])->name('mou.preview');
+        Route::get('/{master}/mou/download', [MouController::class, 'download'])->name('mou.download');
 
         // Aktivitas
         Route::get('/{master}/aktivitas', [AktivitasController::class, 'index'])->name('aktivitas.index');
@@ -197,16 +218,38 @@ Route::middleware(['auth','active'])->group(function () {
     Route::get('/aktivitas/export', [AktivitasController::class, 'export'])->name('aktivitas.export');
     Route::post('/aktivitas/bulk', [AktivitasController::class, 'bulk'])->name('aktivitas.bulk');
 
-    // --- Progress Modul (legacy; tanpa CRUD PenggunaanModul agar tidak duplikat) ---
+    // --- Progress Modul (legacy; fokus pemantauan) ---
     Route::prefix('progress-modul')->name('progress.')->group(function () {
         Route::get('/', [ProgressModulController::class, 'index'])->name('index');
         Route::get('/matrix', [ProgressModulController::class, 'matrix'])->name('matrix');
         Route::get('/export/csv', [ProgressModulController::class, 'exportCsv'])->name('export');
         Route::post('/{master}/ensure', [ProgressModulController::class, 'ensure'])->name('ensure');
+
         Route::get('/{master}', [ProgressModulController::class, 'show'])->name('show');
         Route::post('/{master}/{pm}/toggle', [ProgressModulController::class, 'toggle'])->name('toggle');
         Route::post('/{master}/{modul}/attach', [ProgressModulController::class, 'attach'])->name('attach');
         Route::post('/{master}/{pm}/dates', [ProgressModulController::class, 'updateDates'])->name('updateDates');
+
+        // Aktivitas cepat dari halaman progress
+        Route::post('/{master}/aktivitas', [ProgressModulController::class, 'storeAktivitas'])->name('aktivitas.store');
+
+        // === STAGE PENGGUNAAN MODUL ===
+
+        // (BARU) nama yang dipakai di blade: progress.stage.update  [PATCH]
+        Route::patch('/{master}/penggunaan/{pm}/stage', [ProgressModulController::class, 'updateStageModul'])
+        ->name('stage.update');
+
+        // (BARU) nama yang dipakai di blade: progress.stage.bulk     [PATCH]
+        Route::patch('/{master}/penggunaan/stage-bulk', [ProgressModulController::class, 'bulkUpdateStageModul'])
+        ->name('stage.bulk');
+
+        // (LEGACY) tetap disediakan untuk kompatibilitas lama [POST]
+        Route::post('/{master}/penggunaan/{pm}/stage', [ProgressModulController::class, 'updateStageModul'])
+          ->name('usage.stage.update');
+
+        Route::post('/{master}/penggunaan/stage-bulk', [ProgressModulController::class, 'bulkUpdateStageModul'])
+          ->name('usage.stage.bulk');
+
     });
 
     // --- Aktivitas File ---
@@ -215,10 +258,8 @@ Route::middleware(['auth','active'])->group(function () {
     Route::get('/aktivitas/file/{file}/preview', [AktivitasFileController::class, 'preview'])->name('aktivitas.file.preview');
 
     // --- Tagihan File ---
-    Route::get('/billing-file/{file}/preview',  [BillingPaymentFileController::class, 'preview'])
-    ->name('billing.file.preview');
-    Route::get('/billing-file/{file}/download', [BillingPaymentFileController::class, 'download'])
-    ->name('billing.file.download');
+    Route::get('/billing-file/{file}/preview',  [BillingPaymentFileController::class, 'preview'])->name('billing.file.preview');
+    Route::get('/billing-file/{file}/download', [BillingPaymentFileController::class, 'download'])->name('billing.file.download');
 });
 
 // === Admin (users & logs) ===
@@ -239,7 +280,6 @@ Route::middleware(['auth','active','role:admin'])->group(function () {
     // Admin Logs
     Route::get('/logs', [LogController::class, 'index'])->name('logs.index');
 });
-
 
 // Auth routes (login, register, dll.)
 require __DIR__.'/auth.php';
