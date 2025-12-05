@@ -356,7 +356,7 @@ class TagihanController extends Controller
             'tanggal_bayar' => ['nullable', 'date'],
             'metode'        => ['nullable', 'string', 'max:50'],
             'catatan'       => ['nullable', 'string', 'max:255'],
-            'bukti'         => ['nullable','file','max:5120','mimes:jpg,jpeg,png,webp,pdf'],
+            'bukti'         => ['nullable','file','max:10240','mimes:jpg,jpeg,png,webp,pdf'],
         ]);
 
         DB::beginTransaction();

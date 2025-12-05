@@ -5,65 +5,22 @@ namespace App\Http\Controllers;
 use App\Models\Modul;
 use App\Models\MasterSekolah;
 use App\Models\AktivitasProspek;
-use App\Models\AktivitasFile;
+use App\Models\TagihanKlien;
+use App\Models\User;
+use App\Models\MasterSekolah as MS; // Alias untuk konstanta stage
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Response;
-use Illuminate\Support\Facades\Storage;
-use App\Models\MasterSekolah as MS;
-use App\Models\User;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Carbon\Carbon;
-use App\Models\TagihanKlien;
-
-class AktivitasFileController extends Controller
-{
-    /**
-     * Izinkan preview image + PDF
-     */
-    public function preview(AktivitasFile $file)
-    {
-        // (opsional) authorize
-        if (!Storage::disk('public')->exists($file->path)) {
-            abort(404);
-        }
-
-        $mime = (string) $file->mime;
-
-        // Izinkan image ATAU PDF
-        if (!str_starts_with($mime, 'image/') && $mime !== 'application/pdf') {
-            // fallback: langsung download saja untuk tipe lain
-            return Storage::disk('public')->download($file->path, $file->original_name);
-        }
-
-        $absolute = Storage::disk('public')->path($file->path);
-        return response()->file($absolute, [
-            'Content-Type'        => $mime ?: 'application/octet-stream',
-            'Content-Disposition' => 'inline; filename="'.addslashes($file->original_name).'"',
-            'Cache-Control'       => 'public, max-age=31536000',
-        ]);
-    }
-}
-
-// app/Http/Controllers/AktivitasController.php
 
 class AktivitasController extends Controller
 {
     /**
      * Query dasar untuk halaman GLOBAL.
-     * Query string yang didukung:
-     * - q      : cari di hasil/catatan
-     * - school : cari nama sekolah
-     * - jenis  : like
-     * - from/to: rentang tanggal
-     * - stage  : stage SEKARang pada master
-     * - user_id: filter by id user pembuat
-     * - oleh   : filter by nama user pembuat (LIKE)
      */
     private function baseAktivitasQuery(Request $r)
     {
         $q = AktivitasProspek::query()
             ->with([
-                // PERBAIKAN: Hapus 'kota_kab' dan pastikan 'mou_path' & 'ttd_status' ada.
                 'master:id,nama_sekolah,stage,mou_path,ttd_status',
                 'creator:id,name',
                 'files:id,aktivitas_id,original_name,size,mime,path',
@@ -84,7 +41,7 @@ class AktivitasController extends Controller
             $q->where('jenis', 'like', '%' . trim($r->jenis) . '%');
         }
 
-        // Filter stage SEKARang (di tabel master)
+        // Filter stage SEKARANG (di tabel master)
         if ($r->filled('stage')) {
             $q->whereHas('master', fn($m) => $m->where('stage', (int) $r->stage));
         }
@@ -141,7 +98,7 @@ class AktivitasController extends Controller
         $sort = $request->get('sort', 'tanggal');
         $dir = strtolower($request->get('dir', 'desc')) === 'asc' ? 'asc' : 'desc';
 
-        // Hapus ordering sebelumnya
+        // Hapus ordering default sebelum apply custom sort
         $q->reorder();
 
         // sort by creator_name (users.name)
@@ -163,16 +120,14 @@ class AktivitasController extends Controller
 
         $items = $q->paginate($per)->withQueryString();
 
+        // PERBAIKAN: Syntax array yang benar
         $stageOptions = [
-            $stageOptions = [
              MS::ST_CALON   => 'Calon',
-             MS::ST_SHB     => 'sudah dihubungi',
-             MS::ST_SLTH    => 'sudah dilatih',
+             MS::ST_SHB     => 'Sudah Dihubungi',
+             MS::ST_SLTH    => 'Sudah Dilatih',
              MS::ST_MOU     => 'MOU Aktif',
-             MS::ST_TLMOU   => 'Tindak lanjut MOU',
+             MS::ST_TLMOU   => 'Tindak Lanjut MOU',
              MS::ST_TOLAK   => 'Ditolak',
-        ]
-
         ];
 
         $distinctJenis = AktivitasProspek::query()
@@ -270,8 +225,8 @@ class AktivitasController extends Controller
             $q->leftJoin('users', 'users.id', '=', $table . '.created_by')
                 ->select($table . '.*')
                 ->orderBy('users.name', $dir)
-                ->orderBy($table.'.tanggal', 'desc') // tie-breaker 1
-                ->orderBy($table.'.id', 'desc'); // tie-breaker 2
+                ->orderBy($table.'.tanggal', 'desc')
+                ->orderBy($table.'.id', 'desc');
         } else {
             $allowed = ['tanggal', 'jenis', 'created_at', 'id'];
             if (!in_array($sort, $allowed)) {
@@ -299,9 +254,10 @@ class AktivitasController extends Controller
             'lainnya'        => 'Lainnya',
         ];
 
-        // NEW (opsional): datalist nama user untuk auto-suggest
+        // Suggest creator name
         $creatorIds = AktivitasProspek::where('master_sekolah_id', $master->id)
-                                             ->distinct()->pluck('created_by')->filter();
+            ->distinct()->pluck('created_by')->filter();
+            
         $creatorOptions = collect();
         if ($creatorIds->isNotEmpty()) {
             $creatorOptions = User::whereIn('id', $creatorIds)->orderBy('name')->pluck('name');
@@ -332,11 +288,11 @@ class AktivitasController extends Controller
     public function store(Request $request, MasterSekolah $master)
     {
         $payload = $request->validate([
-            'jenis'   => ['required','string','max:100'],   // dari hidden input = modul_progress
+            'jenis'   => ['required','string','max:100'],
             'hasil'   => ['required','string','max:150'],
             'catatan' => ['nullable','string'],
             'modul_id'=> ['nullable','integer','exists:modul,id'],
-            'files.*' => ['file','max:5120','mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx,ppt,pptx'],
+            'files.*' => ['file','max:10240','mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx,ppt,pptx'],
         ]);
 
         // Prefix hasil dengan nama modul (opsional)

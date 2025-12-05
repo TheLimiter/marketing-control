@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @php
+  $doc = $master; // Kompatibilitas untuk variabel $doc
   $hasFile = !empty($doc?->mou_path);
 @endphp
 
@@ -12,7 +13,8 @@
       @if($hasFile)
         <div class="small">
           File saat ini:
-          <a target="_blank" href="{{ asset('storage/'.$doc->mou_path) }}">Lihat</a>
+          {{-- PERBAIKAN: Link diarahkan ke route preview controller --}}
+          <a target="_blank" href="{{ route('master.mou.preview', $master->id) }}">Lihat</a>
         </div>
       @endif
     </div>
@@ -35,7 +37,7 @@
             <label class="form-label">Upload MOU (PDF/JPG/PNG)</label>
             <input type="file" name="mou" class="form-control input-soft"
                    accept=".pdf,.jpg,.jpeg,.png">
-            <div class="form-text">Maks 5MB. Unggah ulang untuk mengganti file.</div>
+            <div class="form-text">Maks 10MB. Unggah ulang untuk mengganti file.</div>
           </div>
 
           <div class="form-check mb-3">
@@ -80,8 +82,9 @@
             <hr>
             <div class="small">
               <div class="text-muted mb-1">Pratinjau cepat</div>
+              {{-- PERBAIKAN: Link diarahkan ke route preview controller --}}
               <a target="_blank" class="btn btn-sm btn-outline-secondary round"
-                 href="{{ asset('storage/'.$doc->mou_path) }}">
+                 href="{{ route('master.mou.preview', $master->id) }}">
                 <i class="bi bi-box-arrow-up-right me-1"></i> Buka File
               </a>
             </div>

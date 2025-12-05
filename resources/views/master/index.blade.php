@@ -228,30 +228,31 @@
                                             <li><a class="dropdown-item" href="{{ route('master.edit',$sid) }}"><i class="bi bi-pencil me-2"></i>Edit</a></li>
                                             <li>
                                                 @if($mouAda)
-                                                    <a class="dropdown-item" target="_blank" href="{{ asset('storage/'.$x->mou_path) }}"><i class="bi bi-file-earmark-arrow-up me-2"></i>Lihat MOU</a>
+                                                    {{-- PERBAIKAN: Menggunakan Route Preview agar aman dari Forbidden 403 --}}
+                                                    <a class="dropdown-item" target="_blank" href="{{ route('master.mou.preview', $sid) }}"><i class="bi bi-file-earmark-arrow-up me-2"></i>Lihat MOU</a>
                                                 @else
                                                     <a class="dropdown-item" href="{{ route('master.mou.form', $sid) }}"><i class="bi bi-cloud-upload me-2"></i>Upload MOU</a>
                                                 @endif
                                             </li>
                                             <li><a class="dropdown-item" href="{{ route('master.mou.form', $sid) }}"><i class="bi bi-pencil-square me-2"></i>MOU/TTD</a></li>
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li><button type="button" class="dropdown-item" data-bs-toggle="offcanvas" data-bs-target="#schoolDetail"
-                                            data-nama="{{ $x->nama_sekolah }}" data-jenjang="{{ $x->jenjang ?? '—' }}"
-                                            data-alamat="{{ $x->alamat ?? '—' }}" data-narahubung="{{ $x->narahubung ?? '—' }}"
-                                            data-nohp="{{ $x->no_hp ?? '—' }}" data-sumber="{{ $x->sumber ?? '—' }}"
-                                            data-siswa="{{ $x->jumlah_siswa ?? '—' }}" data-mou="{{ $mouAda ? 'Ada' : '—' }}"
-                                            data-ttd="{{ $x->ttd_status ? 'OK' : '—' }}" data-stage="{{ $label }}"
-                                            data-tindak="{{ $x->tindak_lanjut ?? '—' }}" data-catatan="{{ $x->catatan ? \Illuminate\Support\Str::limit($x->catatan, 200) : '—' }}"
-                                            data-created="{{ optional($x->created_at)->format('d/m/Y H:i') }}"
-                                            data-updated="{{ optional($x->updated_at)->diffForHumans() }}"
-                                            data-edit="{{ route('master.edit',$sid) }}"
-                                            data-aktivitas="{{ route('master.aktivitas.index',$sid) }}"
-                                            data-progress="{{ route('progress.show',$sid) }}"
-                                            @if(Route::has('penggunaan-modul.batch-form'))
-                                            data-batch="{{ route('penggunaan-modul.batch-form', ['school' => $sid]) }}"
-                                            @endif
-                                            ><i class="bi bi-info-circle me-2"></i>Detail Cepat
-                                        </button></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><button type="button" class="dropdown-item" data-bs-toggle="offcanvas" data-bs-target="#schoolDetail"
+                                                data-nama="{{ $x->nama_sekolah }}" data-jenjang="{{ $x->jenjang ?? '—' }}"
+                                                data-alamat="{{ $x->alamat ?? '—' }}" data-narahubung="{{ $x->narahubung ?? '—' }}"
+                                                data-nohp="{{ $x->no_hp ?? '—' }}" data-sumber="{{ $x->sumber ?? '—' }}"
+                                                data-siswa="{{ $x->jumlah_siswa ?? '—' }}" data-mou="{{ $mouAda ? 'Ada' : '—' }}"
+                                                data-ttd="{{ $x->ttd_status ? 'OK' : '—' }}" data-stage="{{ $label }}"
+                                                data-tindak="{{ $x->tindak_lanjut ?? '—' }}" data-catatan="{{ $x->catatan ? \Illuminate\Support\Str::limit($x->catatan, 200) : '—' }}"
+                                                data-created="{{ optional($x->created_at)->format('d/m/Y H:i') }}"
+                                                data-updated="{{ optional($x->updated_at)->diffForHumans() }}"
+                                                data-edit="{{ route('master.edit',$sid) }}"
+                                                data-aktivitas="{{ route('master.aktivitas.index',$sid) }}"
+                                                data-progress="{{ route('progress.show',$sid) }}"
+                                                @if(Route::has('penggunaan-modul.batch-form'))
+                                                data-batch="{{ route('penggunaan-modul.batch-form', ['school' => $sid]) }}"
+                                                @endif
+                                                ><i class="bi bi-info-circle me-2"></i>Detail Cepat
+                                            </button></li>
                                    </ul>
                                </div>
                             </td>
@@ -442,7 +443,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (key === 'stage') {
                         // Khusus untuk stage, kita juga update class badge
                         const stageBadge = offcanvas.querySelector('#detail-stage');
-                        const stageClass = data.stage.toLowerCase().replace(/ /g, '-');
                         // Reset class
                         stageBadge.className = 'badge-stage';
                         // Tambah class baru berdasarkan stage
@@ -481,4 +481,3 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 @endpush
-

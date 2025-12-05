@@ -3,19 +3,45 @@
 namespace App\Http\Controllers;
 
 use App\Models\AktivitasFile;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class AktivitasFileController extends Controller
 {
     /**
-     * Unduh file lampiran aktivitas.
+     * Izinkan preview image + PDF inline
+     */
+    public function preview(AktivitasFile $file)
+    {
+        // (opsional) authorize
+        // $this->authorize('view', $file->aktivitas);
+
+        if (!Storage::disk('public')->exists($file->path)) {
+            abort(404);
+        }
+
+        $mime = (string) $file->mime;
+
+        // Izinkan image ATAU PDF ditampilkan inline
+        // Jika bukan keduanya, fallback ke download
+        if (!str_starts_with($mime, 'image/') && $mime !== 'application/pdf') {
+            return $this->download($file);
+        }
+
+        $absolute = Storage::disk('public')->path($file->path);
+        
+        return response()->file($absolute, [
+            'Content-Type'        => $mime ?: 'application/octet-stream',
+            'Content-Disposition' => 'inline; filename="'.addslashes($file->original_name).'"',
+            'Cache-Control'       => 'public, max-age=31536000',
+        ]);
+    }
+
+    /**
+     * Unduh file lampiran aktivitas (Force Download)
      */
     public function download(AktivitasFile $file)
     {
-        // Optional: authorize
-        // $this->authorize('view', $file->aktivitas);
-
         if (!Storage::disk('public')->exists($file->path)) {
             abort(404);
         }
@@ -27,42 +53,17 @@ class AktivitasFileController extends Controller
      */
     public function destroy(AktivitasFile $file)
     {
-        // Optional: authorize delete (admin/owner)
+        // Optional: authorize delete
         // $this->authorize('delete', $file->aktivitas);
 
-        // Hapus file dari storage
-        Storage::disk('public')->delete($file->path);
+        // Hapus fisik file
+        if (Storage::disk('public')->exists($file->path)) {
+            Storage::disk('public')->delete($file->path);
+        }
 
-        // Hapus record dari database
+        // Hapus record database
         $file->delete();
 
         return back()->with('ok', 'Lampiran berhasil dihapus.');
-    }
-
-    /**
-     * Menampilkan pratinjau file (hanya gambar).
-     */
-    public function preview(AktivitasFile $file)
-    {
-        // Optional: authorize, contoh:
-        // $this->authorize('view', $file->aktivitas);
-
-        // Pastikan file ada
-        if (!Storage::disk('public')->exists($file->path)) {
-            abort(404);
-        }
-
-        // Kalau bukan gambar, tolak (biar <img> gak error)
-        if (!str_starts_with((string) $file->mime, 'image/')) {
-            abort(415, 'Hanya gambar yang bisa dipratinjau.');
-        }
-
-        $absolute = storage_path('app/public/'.$file->path);
-        // Tampilkan inline
-        return response()->file($absolute, [
-            'Content-Type'        => $file->mime ?: 'image/*',
-            'Content-Disposition' => 'inline; filename="'.addslashes($file->original_name).'"',
-            'Cache-Control'       => 'public, max-age=31536000',
-        ]);
     }
 }
